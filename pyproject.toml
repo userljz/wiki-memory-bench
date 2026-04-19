@@ -1,0 +1,29 @@
+[project]
+name = "wiki-memory-bench"
+version = "0.1.0"
+description = "Benchmark and evaluation harness for Markdown/Wiki-based long-term memory systems."
+readme = "README.md"
+authors = [
+    { email = "Jinze.Li@amd.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "huggingface_hub>=0.32.0",
+    "litellm>=1.83.10",
+    "pydantic>=2.12.5",
+    "pytest>=9.0.3",
+    "rich>=15.0.0",
+    "sentence-transformers>=5.4.1",
+    "typer>=0.23.1",
+]
+
+[project.scripts]
+wmb = "wiki_memory_bench:main"
+wiki-memory-bench = "wiki_memory_bench:main"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
