@@ -130,15 +130,36 @@ def test_alpha_report_includes_commit_hash_and_exact_commands() -> None:
     assert "uv run wmb run --dataset synthetic-mini --system bm25 --limit 5" in report_text
 
 
-def test_alpha_report_commit_hash_matches_current_head() -> None:
-    report_text = Path("reports/v0.1-alpha-results.md").read_text(encoding="utf-8")
+def test_smoke_generated_alpha_report_commit_hash_matches_current_head(tmp_path: Path) -> None:
+    repo_copy = _clone_repo(tmp_path)
+    script_path = repo_copy / "scripts" / "reproduce_v0_1_alpha.sh"
+    report_dir = tmp_path / "reports-commit-check"
+    synthetic_out = tmp_path / "data-commit-check" / "wiki_memory_20.jsonl"
     head_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"],
+        cwd=repo_copy,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.strip()
 
+    result = subprocess.run(
+        ["bash", str(script_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_copy,
+        env={
+            **os.environ,
+            "WMB_HOME": str(tmp_path / "wmb-home-commit-check"),
+            "WMB_REPORT_DIR": str(report_dir),
+            "WMB_SYNTHETIC_OUT": str(synthetic_out),
+            "WMB_SMOKE_ONLY": "1",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    report_text = (report_dir / "v0.1-alpha-results.md").read_text(encoding="utf-8")
     assert head_sha in report_text
 
 
