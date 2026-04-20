@@ -10,6 +10,7 @@ from wiki_memory_bench.schemas import ChoiceOption, HistoryClip, PreparedExample
 from wiki_memory_bench.utils.tokens import content_tokens, normalize_text
 
 SYSTEM_REGISTRY: dict[str, type["SystemAdapter"]] = {}
+SYSTEM_ALIASES: dict[str, str] = {"full-context": "full-context-oracle"}
 ABSTENTION_MARKERS = ("not enough information", "insufficient information", "unknown", "not answerable")
 
 
@@ -40,8 +41,9 @@ def register_system(system_class: type[SystemAdapter]) -> type[SystemAdapter]:
 def get_system(name: str, **kwargs: object) -> SystemAdapter:
     """Instantiate a system adapter by name."""
 
+    resolved_name = SYSTEM_ALIASES.get(name, name)
     try:
-        system_class = SYSTEM_REGISTRY[name]
+        system_class = SYSTEM_REGISTRY[resolved_name]
     except KeyError as error:
         available = ", ".join(sorted(SYSTEM_REGISTRY))
         raise KeyError(f"Unknown system '{name}'. Available systems: {available}") from error

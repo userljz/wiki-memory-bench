@@ -95,6 +95,7 @@ def basic_memory_doctor_payload() -> dict[str, object]:
         "version": status.version,
         "tested_version": status.tested_version,
         "mode": status.mode,
+        "backend_mode": "real_basic_memory" if status.available else "fallback_local_search",
         "install_command": "uv tool install basic-memory",
         "docs": "docs/basic-memory-adapter.md",
         "limitations": status.limitations,
@@ -115,10 +116,14 @@ class BasicMemoryAdapter(SystemAdapter):
         self.open_qa_answerer = build_open_qa_answerer(answerer, task_name="open-qa-answerer")
         self.status = detect_basic_memory_cli()
         self._artifact_root: Path | None = None
+        self._commands_used: list[str] = []
+        self._external_cli_invoked = False
 
     def prepare_run(self, run_dir: Path, dataset_name: str) -> None:
         self._artifact_root = run_dir / "artifacts" / "basic-memory"
         self._artifact_root.mkdir(parents=True, exist_ok=True)
+        self._commands_used = []
+        self._external_cli_invoked = False
         if hasattr(self.answerer, "set_artifact_dir"):
             self.answerer.set_artifact_dir(run_dir / "artifacts" / "llm" / "answerer")
         if hasattr(self.open_qa_answerer, "set_artifact_dir"):
@@ -134,6 +139,7 @@ class BasicMemoryAdapter(SystemAdapter):
         notes = self.ingest(example, project_dir)
         sync_result = self._sync_project(project_dir)
         retrieved_notes, retrieval_backend = self.retrieve(example.question, notes, project_dir)
+        backend_mode = "real_basic_memory" if retrieval_backend == "basic-memory-cli" else "fallback_local_search"
 
         retrieved_items = [
             RetrievedItem(
@@ -191,10 +197,13 @@ class BasicMemoryAdapter(SystemAdapter):
                     "answerer_mode": self.answerer_mode,
                     "basic_memory_available": self.status.available,
                     "basic_memory_command": self.status.command,
-                    "basic_memory_version": self.status.version,
+                    "detected_version": self.status.version,
+                    "backend_mode": backend_mode,
                     "basic_memory_mode": self.status.mode,
                     "basic_memory_backend": retrieval_backend,
                     "basic_memory_sync_success": sync_result,
+                    "commands_used": list(self._commands_used),
+                    "external_cli_invoked": self._external_cli_invoked,
                     "basic_memory_project_dir": str(project_dir),
                     **selection.metadata,
                 },
@@ -237,10 +246,13 @@ class BasicMemoryAdapter(SystemAdapter):
                 "answerer_mode": self.answerer_mode,
                 "basic_memory_available": self.status.available,
                 "basic_memory_command": self.status.command,
-                "basic_memory_version": self.status.version,
+                "detected_version": self.status.version,
+                "backend_mode": backend_mode,
                 "basic_memory_mode": self.status.mode,
                 "basic_memory_backend": retrieval_backend,
                 "basic_memory_sync_success": sync_result,
+                "commands_used": list(self._commands_used),
+                "external_cli_invoked": self._external_cli_invoked,
                 "basic_memory_project_dir": str(project_dir),
                 **selection.metadata,
             },
@@ -365,7 +377,7 @@ class BasicMemoryAdapter(SystemAdapter):
             note = note_by_permalink.get(permalink) or note_by_path.get(str(file_path))
             if note is not None:
                 matched.append((note, float(total - index)))
-        return matched or None
+        return matched
 
     def _local_search(self, *, query: str, notes: list[BasicMemoryNote]) -> list[tuple[BasicMemoryNote, float]]:
         documents = [content_tokens(note.content) for note in notes]
@@ -377,6 +389,8 @@ class BasicMemoryAdapter(SystemAdapter):
         return ranked[: self.top_k]
 
     def _run_cli(self, command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        self._external_cli_invoked = True
+        self._commands_used.append(" ".join(command))
         return subprocess.run(
             command,
             cwd=str(cwd),

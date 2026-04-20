@@ -9,6 +9,12 @@ The adapter is intentionally optional:
 - local fallback mode works even when the CLI is not installed
 - when the CLI is installed, the adapter can run best-effort `sync` and `search-notes`
 
+Important benchmarking note:
+
+- `fallback_local_search` is useful for smoke tests and adapter development
+- it is **not** a real Basic Memory benchmark result
+- only `real_basic_memory` should be interpreted as an actual Basic Memory-backed run
+
 ## Tested Version
 The adapter is currently designed and reviewed against the **Basic Memory v0.19.x CLI contract**, based on the reference repository included under `references/basic-memory/`.
 
@@ -91,6 +97,12 @@ uv run wmb run --dataset synthetic-wiki-memory --system basic-memory --limit 20
 uv run wmb report runs/latest
 ```
 
+The doctor output explicitly reports:
+
+- whether the CLI was detected
+- `backend_mode = real_basic_memory | fallback_local_search`
+- the tested CLI contract version
+
 ## Limitations
 Current limitations of the adapter:
 
@@ -112,6 +124,8 @@ This still works and uses local fallback retrieval:
 uv run wmb run --dataset synthetic-wiki-memory --system basic-memory --limit 20
 ```
 
+This mode is for smoke tests and development only, not for reporting a real Basic Memory benchmark result.
+
 ### With Basic Memory installed
 This uses the same command, but the adapter will try to:
 
@@ -124,6 +138,23 @@ Use doctor output to confirm what mode is active:
 ```bash
 uv run wmb systems doctor basic-memory
 ```
+
+## Recorded Metadata
+Every Basic Memory run records adapter-specific metadata so reports can distinguish real integration from fallback behavior.
+
+Important fields:
+
+- `backend_mode`
+- `detected_version`
+- `commands_used`
+- `external_cli_invoked`
+
+Interpretation:
+
+- `backend_mode = real_basic_memory`
+  means CLI-backed retrieval was actually used
+- `backend_mode = fallback_local_search`
+  means the adapter ran in compatibility mode and should not be presented as a true Basic Memory benchmark
 
 ## Testing
 Default automated coverage includes:

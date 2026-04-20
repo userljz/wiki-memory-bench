@@ -17,7 +17,8 @@ The first version should support:
   - `locomo-mc10` (project-local normalized key backed by `locomo10.json`)
   - a tiny synthetic suite
 - systems:
-  - `full-context`
+  - `full-context-oracle`
+  - `full-context-heuristic`
   - `bm25`
   - `vector-rag`
   - `markdown-summary`
@@ -270,10 +271,16 @@ The adapter is free to ingest clips incrementally inside `run_example`, but the 
 
 ### Built-In Baselines
 
-#### `full-context`
+#### `full-context-oracle`
 - no indexing
 - concatenates all clips directly into the reader prompt
-- establishes an upper-bound baseline for "just stuff everything into context"
+- establishes an oracle-style upper bound for "just stuff everything into context"
+- should not be treated as a fair deployable memory baseline
+
+#### `full-context-heuristic`
+- no indexing
+- uses the full context but answers with the same deterministic answerer family as retrieval baselines
+- provides a non-oracle point of comparison against `bm25`, `vector-rag`, and `clipwiki`
 
 #### `bm25`
 - lexical retrieval over clip or session text

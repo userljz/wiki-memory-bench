@@ -81,10 +81,13 @@ class DeterministicMultipleChoiceAnswerer:
                 item_tokens = set(content_tokens(item.text))
                 overlap = len(choice_tokens & item_tokens)
                 phrase_bonus = 3.0 if normalized_choice and normalized_choice in normalize_text(item.text) else 0.0
+                embedding_score = self._embedding_score(choice_embeddings, chunk_embeddings, choice_index, item_index)
+                if overlap == 0 and phrase_bonus == 0.0 and embedding_score == 0.0:
+                    continue
+
                 question_overlap = len(question_tokens & item_tokens)
                 normalized_retrieval = max(0.0, item.score) / max_retrieval_score
                 lexical_score = overlap * 2.0 + phrase_bonus + question_overlap * 0.35 + normalized_retrieval * 0.75
-                embedding_score = self._embedding_score(choice_embeddings, chunk_embeddings, choice_index, item_index)
                 item_score = lexical_score + embedding_score
                 total_score += item_score
 

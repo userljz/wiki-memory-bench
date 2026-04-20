@@ -95,6 +95,7 @@ def systems_doctor_command(
     table.add_row("Version", str(payload["version"]))
     table.add_row("Tested version", str(payload["tested_version"]))
     table.add_row("Adapter mode", str(payload["mode"]))
+    table.add_row("Backend mode", str(payload["backend_mode"]))
     table.add_row("Install command", str(payload["install_command"]))
     table.add_row("Docs", str(payload["docs"]))
     console.print(table)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from wiki_memory_bench.datasets.base import DatasetAdapter, register_dataset
-from wiki_memory_bench.schemas import ChoiceOption, HistoryClip, PreparedDataset, PreparedExample, TaskType
+from wiki_memory_bench.schemas import ChoiceOption, HistoryClip, PreparedDataset, PreparedExample, SessionTurn, TaskType
 
 
 def _clip(
@@ -35,6 +35,10 @@ def _choices(*values: str) -> list[ChoiceOption]:
     ]
 
 
+def _session_turns(*pairs: tuple[str, str]) -> list[SessionTurn]:
+    return [SessionTurn(role=role, content=content) for role, content in pairs]
+
+
 @register_dataset
 class SyntheticMiniDataset(DatasetAdapter):
     """Five deterministic starter cases for the benchmark skeleton."""
@@ -59,6 +63,14 @@ class SyntheticMiniDataset(DatasetAdapter):
                         "My favorite database for analytics work is PostgreSQL.",
                     ),
                 ],
+                haystack_sessions=[
+                    _session_turns(
+                        ("avery", "My favorite database for analytics work is PostgreSQL."),
+                    ),
+                ],
+                haystack_session_ids=["session-1"],
+                haystack_session_summaries=["Avery says PostgreSQL is the preferred analytics database."],
+                haystack_session_datetimes=[datetime.fromisoformat("2026-04-01T09:00:00")],
                 choices=_choices(
                     "PostgreSQL",
                     "Redis",
@@ -70,7 +82,7 @@ class SyntheticMiniDataset(DatasetAdapter):
                 question_type="direct_recall",
                 answer="PostgreSQL",
                 correct_choice_id="choice-1",
-                gold_evidence=["clip-1"],
+                gold_evidence=["session-1"],
                 metadata={"case_type": "direct_recall", "question_type": "direct_recall"},
             ),
             PreparedExample(
@@ -96,6 +108,23 @@ class SyntheticMiniDataset(DatasetAdapter):
                         "Update for the team wiki: my office is now in Seattle.",
                     ),
                 ],
+                haystack_sessions=[
+                    _session_turns(
+                        ("avery", "At the start of the year, my office was in Austin."),
+                    ),
+                    _session_turns(
+                        ("avery", "Update for the team wiki: my office is now in Seattle."),
+                    ),
+                ],
+                haystack_session_ids=["session-1", "session-2"],
+                haystack_session_summaries=[
+                    "Older note: Avery's office was in Austin.",
+                    "Current note: Avery's office is now in Seattle.",
+                ],
+                haystack_session_datetimes=[
+                    datetime.fromisoformat("2026-01-10T09:00:00"),
+                    datetime.fromisoformat("2026-03-15T18:00:00"),
+                ],
                 choices=_choices(
                     "Austin",
                     "Seattle",
@@ -107,7 +136,7 @@ class SyntheticMiniDataset(DatasetAdapter):
                 question_type="updated_fact",
                 answer="Seattle",
                 correct_choice_id="choice-2",
-                gold_evidence=["clip-3"],
+                gold_evidence=["session-2"],
                 metadata={"case_type": "updated_fact", "question_type": "updated_fact"},
             ),
             PreparedExample(
@@ -133,6 +162,15 @@ class SyntheticMiniDataset(DatasetAdapter):
                         "The customer demo is scheduled for 2026-04-25.",
                     ),
                 ],
+                haystack_sessions=[
+                    _session_turns(
+                        ("program-manager", "The architecture review is scheduled for 2026-04-21."),
+                        ("program-manager", "The customer demo is scheduled for 2026-04-25."),
+                    ),
+                ],
+                haystack_session_ids=["session-1"],
+                haystack_session_summaries=["Architecture review date is 2026-04-21; customer demo date is 2026-04-25."],
+                haystack_session_datetimes=[datetime.fromisoformat("2026-04-05T10:30:00")],
                 choices=_choices(
                     "2026-04-19",
                     "2026-04-21",
@@ -144,7 +182,7 @@ class SyntheticMiniDataset(DatasetAdapter):
                 question_type="temporal_question",
                 answer="2026-04-21",
                 correct_choice_id="choice-2",
-                gold_evidence=["clip-4"],
+                gold_evidence=["session-1"],
                 metadata={"case_type": "temporal_question", "question_type": "temporal_question"},
             ),
             PreparedExample(
@@ -170,6 +208,23 @@ class SyntheticMiniDataset(DatasetAdapter):
                         "Correction: use 4 spaces for indentation in this repo from now on.",
                     ),
                 ],
+                haystack_sessions=[
+                    _session_turns(
+                        ("maintainer", "Old style note: use tabs for indentation in this repo."),
+                    ),
+                    _session_turns(
+                        ("maintainer", "Correction: use 4 spaces for indentation in this repo from now on."),
+                    ),
+                ],
+                haystack_session_ids=["session-1", "session-2"],
+                haystack_session_summaries=[
+                    "Older style guide says to use tabs.",
+                    "Current style guide says to use 4 spaces.",
+                ],
+                haystack_session_datetimes=[
+                    datetime.fromisoformat("2026-02-01T08:00:00"),
+                    datetime.fromisoformat("2026-04-02T12:00:00"),
+                ],
                 choices=_choices(
                     "tabs",
                     "2 spaces",
@@ -181,7 +236,7 @@ class SyntheticMiniDataset(DatasetAdapter):
                 question_type="contradiction",
                 answer="4 spaces",
                 correct_choice_id="choice-3",
-                gold_evidence=["clip-7"],
+                gold_evidence=["session-2"],
                 metadata={"case_type": "contradiction", "question_type": "contradiction"},
             ),
             PreparedExample(
@@ -207,6 +262,15 @@ class SyntheticMiniDataset(DatasetAdapter):
                         "The API service runs in a container on our internal cluster.",
                     ),
                 ],
+                haystack_sessions=[
+                    _session_turns(
+                        ("devops", "The staging environment uses PostgreSQL 16."),
+                        ("devops", "The API service runs in a container on our internal cluster."),
+                    ),
+                ],
+                haystack_session_ids=["session-1"],
+                haystack_session_summaries=["Staging uses PostgreSQL 16, but no cloud region is specified."],
+                haystack_session_datetimes=[datetime.fromisoformat("2026-04-03T11:00:00")],
                 choices=_choices(
                     "us-west-2",
                     "eu-west-1",

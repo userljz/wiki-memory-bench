@@ -20,7 +20,8 @@ def test_cli_lists_systems() -> None:
 
     assert result.exit_code == 0
     assert "basic-memory" in result.output
-    assert "full-context" in result.output
+    assert "full-context-oracle" in result.output
+    assert "full-context-heuristic" in result.output
     assert "bm25" in result.output
     assert "clipwiki" in result.output
     assert "vector-rag" in result.output

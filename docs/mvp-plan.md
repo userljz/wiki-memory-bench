@@ -184,9 +184,10 @@ Files:
 
 Tasks:
 
-1. Implement `full-context` as the simplest reader baseline.
-2. Implement `bm25` over normalized clip or session text.
-3. Implement `vector-rag` using a local embedding model and local vector index.
+1. Implement `full-context-oracle` as the sanity upper bound baseline.
+2. Implement `full-context-heuristic` as the non-oracle full-context comparison point.
+3. Implement `bm25` over normalized clip or session text.
+4. Implement `vector-rag` using a local embedding model and local vector index.
 
 Exit criteria:
 

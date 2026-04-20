@@ -1,4 +1,4 @@
-"""Full-context deterministic baseline."""
+"""Full-context baselines."""
 
 from __future__ import annotations
 
@@ -11,12 +11,10 @@ from wiki_memory_bench.systems.base import SystemAdapter, choice_index, choose_m
 from wiki_memory_bench.utils.tokens import estimate_text_tokens, estimate_token_total
 
 
-@register_system
-class FullContextBaseline(SystemAdapter):
-    """Answer multiple-choice questions using the full ordered context."""
+class _BaseFullContextBaseline(SystemAdapter):
+    """Shared full-context behavior."""
 
-    name = "full-context"
-    description = "Uses the full context and currently returns a deterministic oracle answer with local artifacts."
+    baseline_type = "heuristic_reference"
 
     def __init__(self, answerer: str = "deterministic", **_: object) -> None:
         self.answerer_mode = answerer
@@ -29,10 +27,9 @@ class FullContextBaseline(SystemAdapter):
         if hasattr(self.open_qa_answerer, "set_artifact_dir"):
             self.open_qa_answerer.set_artifact_dir(run_dir / "artifacts" / "llm" / "answerer")
 
-    def run(self, example: PreparedExample) -> SystemResult:
-        started = perf_counter()
+    def _retrieved_items(self, example: PreparedExample) -> list[RetrievedItem]:
         ordered_clips = sorted(example.history_clips, key=lambda clip: clip.timestamp)
-        retrieved_items = [
+        return [
             RetrievedItem(
                 clip_id=clip.clip_id,
                 rank=index + 1,
@@ -43,24 +40,53 @@ class FullContextBaseline(SystemAdapter):
             for index, clip in enumerate(ordered_clips)
         ]
 
+    def _oracle_choice(self, example: PreparedExample):
+        return example.choices[example.correct_choice_index]
+
+    def _select_mc_answer(
+        self,
+        example: PreparedExample,
+        ordered_clips,
+        retrieved_items: list[RetrievedItem],
+    ):
+        lexical_choice, supporting_clip, confidence = choose_multiple_choice_answer(example, ordered_clips)
+        if self.answerer_mode == "llm":
+            selection = self.answerer.select_choice(example, retrieved_items)
+            selected_choice = selection.choice
+            if selection.supporting_item is not None:
+                supporting_clip = next(
+                    (clip for clip in ordered_clips if clip.clip_id == selection.supporting_item.clip_id),
+                    supporting_clip,
+                )
+            confidence = selection.confidence
+            llm_rationale = selection.rationale
+            llm_usage = selection.token_usage
+            selection_mode = "llm"
+        else:
+            selected_choice, supporting_clip, confidence, llm_rationale, llm_usage, selection_mode = self._deterministic_mc(
+                example,
+                lexical_choice,
+                supporting_clip,
+                confidence,
+            )
+
+        return lexical_choice, selected_choice, supporting_clip, confidence, llm_rationale, llm_usage, selection_mode
+
+    def _deterministic_mc(self, example, lexical_choice, supporting_clip, confidence):
+        raise NotImplementedError
+
+    def run(self, example: PreparedExample) -> SystemResult:
+        started = perf_counter()
+        ordered_clips = sorted(example.history_clips, key=lambda clip: clip.timestamp)
+        retrieved_items = self._retrieved_items(example)
         citations = []
+
         if example.task_type == TaskType.MULTIPLE_CHOICE:
-            lexical_choice, supporting_clip, confidence = choose_multiple_choice_answer(example, ordered_clips)
-            if self.answerer_mode == "deterministic":
-                selected_choice = example.choices[example.correct_choice_index]
-                llm_rationale = None
-                llm_usage = TokenUsage()
-            else:
-                selection = self.answerer.select_choice(example, retrieved_items)
-                selected_choice = selection.choice
-                if selection.supporting_item is not None:
-                    supporting_clip = next(
-                        (clip for clip in ordered_clips if clip.clip_id == selection.supporting_item.clip_id),
-                        supporting_clip,
-                    )
-                confidence = selection.confidence
-                llm_rationale = selection.rationale
-                llm_usage = selection.token_usage
+            lexical_choice, selected_choice, supporting_clip, confidence, llm_rationale, llm_usage, selection_mode = self._select_mc_answer(
+                example,
+                ordered_clips,
+                retrieved_items,
+            )
 
             if supporting_clip is not None:
                 citations.append(
@@ -95,7 +121,8 @@ class FullContextBaseline(SystemAdapter):
                 metadata={
                     "confidence": round(confidence, 4),
                     "context_size": len(ordered_clips),
-                    "selection_mode": "oracle" if self.answerer_mode == "deterministic" else "llm",
+                    "selection_mode": selection_mode,
+                    "baseline_type": self.baseline_type,
                     "lexical_fallback_choice": lexical_choice.choice_id,
                     "llm_rationale": llm_rationale,
                     "retrieval_top_k": len(retrieved_items),
@@ -133,8 +160,37 @@ class FullContextBaseline(SystemAdapter):
                 "confidence": round(selection.confidence, 4),
                 "context_size": len(ordered_clips),
                 "answerer_mode": self.answerer_mode,
+                "baseline_type": self.baseline_type,
                 "llm_rationale": selection.rationale,
                 "retrieval_top_k": len(retrieved_items),
                 **selection.metadata,
             },
         )
+
+
+@register_system
+class FullContextOracleBaseline(_BaseFullContextBaseline):
+    """Oracle upper-bound full-context baseline."""
+
+    name = "full-context-oracle"
+    description = "Full-context sanity upper bound. Deterministic mode uses the gold answer and is not a fair deployable baseline."
+    baseline_type = "oracle_upper_bound"
+
+    def _deterministic_mc(self, example, lexical_choice, supporting_clip, confidence):
+        return self._oracle_choice(example), supporting_clip, confidence, None, TokenUsage(), "oracle"
+
+
+@register_system
+class FullContextHeuristicBaseline(_BaseFullContextBaseline):
+    """Non-oracle full-context heuristic baseline."""
+
+    name = "full-context-heuristic"
+    description = "Full-context heuristic baseline using the same deterministic answerer family as retrieval baselines."
+    baseline_type = "heuristic_reference"
+
+    def _deterministic_mc(self, example, lexical_choice, supporting_clip, confidence):
+        return lexical_choice, supporting_clip, confidence, None, TokenUsage(), "heuristic"
+
+
+# Backward-compatible import alias for older code paths.
+FullContextBaseline = FullContextOracleBaseline

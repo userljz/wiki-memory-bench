@@ -24,6 +24,7 @@ def test_basic_memory_doctor_reports_missing_cli(monkeypatch: pytest.MonkeyPatch
 
     assert payload["available"] is False
     assert payload["mode"] == "file-compatible-local-fallback"
+    assert payload["backend_mode"] == "fallback_local_search"
 
 
 def test_basic_memory_doctor_reports_installed_cli(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,7 +62,21 @@ def test_basic_memory_adapter_uses_subprocess_when_cli_available(tmp_path: Path,
             return subprocess.CompletedProcess(
                 args=command,
                 returncode=0,
-                stdout=json.dumps({"query": "q", "total": 0, "page": 1, "page_size": 4, "results": []}),
+                stdout=json.dumps(
+                    {
+                        "query": "q",
+                        "total": 1,
+                        "page": 1,
+                        "page_size": 4,
+                        "results": [
+                            {
+                                "title": "Session source-001-session-1 summary",
+                                "permalink": "sessions/synthetic-wiki-memory-direct_recall-001-source-001-session-1-summary",
+                                "file_path": "sessions/synthetic-wiki-memory-direct_recall-001-source-001-session-1-summary.md",
+                            }
+                        ],
+                    }
+                ),
                 stderr="",
             )
         return subprocess.CompletedProcess(args=command, returncode=1, stdout="", stderr="unexpected")
@@ -75,8 +90,47 @@ def test_basic_memory_adapter_uses_subprocess_when_cli_available(tmp_path: Path,
     prediction = adapter.run(_example())
 
     assert prediction.retrieved_items
+    assert prediction.metadata["basic_memory_backend"] == "basic-memory-cli"
+    assert prediction.metadata["backend_mode"] == "real_basic_memory"
+    assert prediction.metadata["detected_version"] == "basic-memory 0.19.0"
+    assert prediction.metadata["external_cli_invoked"] is True
+    assert prediction.metadata["commands_used"]
     assert any(command == ["bm", "sync"] for command in commands)
     assert any(command[:3] == ["bm", "tool", "search-notes"] for command in commands)
+
+
+def test_basic_memory_cli_empty_results_do_not_trigger_local_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "wiki_memory_bench.systems.basic_memory.shutil.which",
+        lambda command: "/usr/bin/bm" if command == "bm" else None,
+    )
+
+    def fake_run(command, **kwargs):  # type: ignore[no-untyped-def]
+        if command == ["bm", "--version"]:
+            return subprocess.CompletedProcess(args=command, returncode=0, stdout="basic-memory 0.19.0\n", stderr="")
+        if command == ["bm", "sync"]:
+            return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+        if command[:3] == ["bm", "tool", "search-notes"]:
+            return subprocess.CompletedProcess(
+                args=command,
+                returncode=0,
+                stdout=json.dumps({"query": "q", "total": 0, "page": 1, "page_size": 4, "results": []}),
+                stderr="",
+            )
+        return subprocess.CompletedProcess(args=command, returncode=1, stdout="", stderr="unexpected")
+
+    monkeypatch.setattr("wiki_memory_bench.systems.basic_memory.subprocess.run", fake_run)
+
+    adapter = BasicMemoryAdapter()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    adapter.prepare_run(run_dir, "synthetic-wiki-memory")
+    prediction = adapter.run(_example())
+
+    assert prediction.metadata["basic_memory_backend"] == "basic-memory-cli"
+    assert prediction.metadata["backend_mode"] == "real_basic_memory"
+    assert prediction.metadata["external_cli_invoked"] is True
+    assert prediction.retrieved_items == []
 
 
 def test_basic_memory_adapter_falls_back_without_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,6 +144,10 @@ def test_basic_memory_adapter_falls_back_without_cli(tmp_path: Path, monkeypatch
 
     assert prediction.retrieved_items
     assert prediction.metadata["basic_memory_backend"] == "local-fallback"
+    assert prediction.metadata["backend_mode"] == "fallback_local_search"
+    assert prediction.metadata["detected_version"] is None
+    assert prediction.metadata["external_cli_invoked"] is False
+    assert prediction.metadata["commands_used"] == []
     assert "basic-memory" in str(run_dir / "artifacts" / "basic-memory")
 
 
@@ -101,6 +159,7 @@ def test_cli_systems_doctor_basic_memory(monkeypatch: pytest.MonkeyPatch) -> Non
     assert result.exit_code == 0
     assert "System Doctor" in result.output
     assert "basic-memory" in result.output
+    assert "fallback_local_search" in result.output
 
 
 def test_cli_run_basic_memory_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

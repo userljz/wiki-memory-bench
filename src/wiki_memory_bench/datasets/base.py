@@ -140,13 +140,11 @@ def _apply_sample_to_lines(example_lines: list[str], sample: int | None) -> list
     if sample is None or sample >= len(example_lines):
         return example_lines
     rng = random.Random(42)
-    selected_indices = sorted(rng.sample(range(len(example_lines)), sample))
-    return [example_lines[index] for index in selected_indices]
+    return rng.sample(example_lines, sample)
 
 
 def _apply_sample_to_examples(examples: list[object], sample: int | None) -> list[object]:
     if sample is None or sample >= len(examples):
         return examples
     rng = random.Random(42)
-    selected_indices = sorted(rng.sample(range(len(examples)), sample))
-    return [examples[index] for index in selected_indices]
+    return rng.sample(examples, sample)

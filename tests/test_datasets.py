@@ -1,4 +1,5 @@
 from wiki_memory_bench.datasets import get_dataset, list_datasets
+from wiki_memory_bench.datasets.base import _apply_sample_to_examples
 
 
 def test_synthetic_dataset_is_registered() -> None:
@@ -19,3 +20,12 @@ def test_synthetic_dataset_loads_five_examples() -> None:
         "contradiction",
         "abstention",
     ]
+
+
+def test_sampling_returns_deterministic_random_order_not_sorted_prefix() -> None:
+    population = list(range(20))
+    first = _apply_sample_to_examples(population, sample=10)
+    second = _apply_sample_to_examples(population, sample=10)
+
+    assert first == second
+    assert first != sorted(first)

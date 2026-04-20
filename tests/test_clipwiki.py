@@ -3,6 +3,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from tests.locomo_fixture import build_locomo_record, write_locomo_fixture
+from wiki_memory_bench.datasets import get_dataset
 from wiki_memory_bench.cli import app
 from wiki_memory_bench.clipwiki.compiler import compile_clipwiki
 from wiki_memory_bench.datasets.locomo_mc10 import convert_locomo_record
@@ -33,6 +34,13 @@ def test_clipwiki_baseline_returns_citations_and_wiki_metrics(tmp_path: Path) ->
     assert prediction.wiki_size_tokens is not None and prediction.wiki_size_tokens > 0
     assert prediction.retrieved_items
     assert "artifacts/wiki" in prediction.metadata["wiki_dir"]
+
+
+def test_clipwiki_oracle_curated_uses_session_level_gold_evidence_for_synthetic_mini(tmp_path: Path) -> None:
+    example = get_dataset("synthetic-mini").load().examples[1]
+    compiled = compile_clipwiki(example, tmp_path, mode="oracle-curated")
+
+    assert compiled.selected_session_ids == ["session-2"]
 
 
 def test_cli_clipwiki_smoke(tmp_path: Path) -> None:

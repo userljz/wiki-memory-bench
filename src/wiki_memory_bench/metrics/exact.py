@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from wiki_memory_bench.schemas import EvaluatedExampleResult, PreparedExample, SystemResult
-from wiki_memory_bench.utils.tokens import estimate_text_tokens, normalize_text
+from wiki_memory_bench.utils.tokens import content_tokens, estimate_text_tokens, normalize_text
 
 
 def evaluate_open_qa(example: PreparedExample, prediction: SystemResult) -> EvaluatedExampleResult:
@@ -63,13 +63,13 @@ def compute_open_qa_match(predicted_answer: str, gold_answer: str) -> tuple[bool
     if not normalized_pred or not normalized_gold:
         return False, False
 
-    if normalized_gold in normalized_pred or normalized_pred in normalized_gold:
-        return False, True
-
-    gold_tokens = set(normalized_gold.split())
-    pred_tokens = set(normalized_pred.split())
+    gold_tokens = set(content_tokens(gold_answer))
+    pred_tokens = set(content_tokens(predicted_answer))
     if not gold_tokens or not pred_tokens:
         return False, False
+
+    if gold_tokens.issubset(pred_tokens) or pred_tokens.issubset(gold_tokens):
+        return False, True
 
     overlap_ratio = len(gold_tokens & pred_tokens) / len(gold_tokens)
     return False, overlap_ratio >= 0.6

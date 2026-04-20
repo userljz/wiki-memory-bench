@@ -65,7 +65,7 @@ uv run wmb run --dataset synthetic-wiki-memory --system clipwiki --limit 50
 uv run wmb report runs/latest
 ```
 
-### 可选外部 adapter：Basic Memory
+### 实验性外部 adapter：Basic Memory
 
 ```bash
 uv tool install basic-memory
@@ -105,15 +105,16 @@ uv run wmb report runs/latest
 ```
 
 ## 示例输出表
-下面是本地小规模运行的示例结果。这些数字只是示例，不是正式 leaderboard。
+下面是可复现的 v0.1-alpha 示例结果。完整结果见 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)，由 [`scripts/reproduce_v0_1_alpha.sh`](scripts/reproduce_v0_1_alpha.sh) 自动生成。
 
 | 数据集 | 系统 | 模式 | Answerer | Accuracy | Avg Retrieved Tokens | Avg Latency |
 | --- | --- | --- | --- | ---: | ---: | ---: |
-| `locomo-mc10` | `bm25` | default | deterministic | 25.00% | 2282.40 | 5.82 ms |
-| `locomo-mc10` | `vector-rag` | default | deterministic | 20.00% | 724.75 | 1581.69 ms |
-| `locomo-mc10` | `clipwiki` | `oracle-curated` | deterministic | 35.00% | 3284.15 | 35.88 ms |
-| `longmemeval-s` | `bm25` | default | deterministic | 60.00% | 9639.45 | 14.21 ms |
-| `synthetic-wiki-memory` | `clipwiki` | default | deterministic | 10.00% | 202.16 | 16.38 ms |
+| `synthetic-mini` | `bm25` | default | deterministic | 100.00% | 37.40 | 0.11 ms |
+| `synthetic-wiki-memory` | `bm25` | default | deterministic | 50.00% | 41.94 | 0.04 ms |
+| `synthetic-wiki-memory` | `clipwiki` | default | deterministic | 10.00% | 202.16 | 16.87 ms |
+| `locomo-mc10` | `bm25` | default | deterministic | 28.00% | 2189.48 | 3.13 ms |
+| `locomo-mc10` | `vector-rag` | default | deterministic | 22.00% | 765.40 | 870.27 ms |
+| `locomo-mc10` | `clipwiki` | `full-wiki` | deterministic | 32.00% | 3447.58 | 88.00 ms |
 
 ## 已支持的数据集
 | 数据集别名 | 任务类型 | 状态 | 说明 |
@@ -137,11 +138,47 @@ uv run wmb datasets prepare longmemeval --split m --sample 50
 ## 已支持的记忆系统
 | 系统 | 检索单元 | Answerer 模式 | 说明 |
 | --- | --- | --- | --- |
-| `full-context` | full history | deterministic, llm | 最简单的上界 / sanity baseline |
+| `full-context-oracle` | full history | deterministic, llm | sanity upper bound；deterministic 模式直接使用 gold choice，不应当作公平的可部署 baseline |
+| `full-context-heuristic` | full history | deterministic, llm | 非 oracle 的 full-context heuristic，使用和其他检索基线同一类 deterministic answerer |
 | `bm25` | lexical session documents | deterministic, llm | 成本低、完全本地的检索 baseline |
 | `vector-rag` | embedding-based session chunks | deterministic, llm | 使用 `sentence-transformers` 的内存向量索引 |
 | `clipwiki` | compiled wiki pages | deterministic, llm | 确定性 Markdown wiki baseline，支持 `oracle-curated`、`full-wiki`、`noisy-curated` |
-| `basic-memory` | file-compatible Markdown notes, optional CLI search | deterministic, llm | 可选外部 adapter，默认可退化到本地 fallback，并在安装 CLI 时做 best-effort 集成 |
+| `basic-memory` | file-compatible Markdown notes, optional CLI search | deterministic, llm | 实验性外部 adapter，默认可退化到本地 fallback，并在安装 CLI 时做 best-effort 集成 |
+
+兼容性说明：
+
+- `full-context` 目前保留为 `full-context-oracle` 的向后兼容别名
+
+`full-context-oracle` 可以作为 sanity upper bound 使用，但**不应**直接和真实 retrieval / memory system baseline 做公平对比。
+
+## 实验性外部 Adapters
+当前的实验性外部 adapter：
+
+- `basic-memory`
+
+重要说明：
+
+- 如果本机没有安装 Basic Memory CLI，这个 adapter 会自动回退到本地 lexical search
+- 这种 fallback mode 适合 smoke test 和 adapter 开发
+- 但它**不应**被视为“真实的 Basic Memory benchmark 结果”
+
+请始终先运行：
+
+```bash
+uv run wmb systems doctor basic-memory
+```
+
+确认当前运行的是：
+
+- `real_basic_memory`
+- `fallback_local_search`
+
+如果你想跑真实 integration tests：
+
+```bash
+export WMB_RUN_BASIC_MEMORY_INTEGRATION=1
+uv run pytest tests/test_basic_memory.py
+```
 
 `vector-rag` 默认配置：
 
