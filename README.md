@@ -143,7 +143,6 @@ uv run wmb datasets prepare longmemeval --split m --sample 50
 | `bm25` | lexical session documents | deterministic, llm | cheap local retrieval baseline |
 | `vector-rag` | embedding-based session chunks | deterministic, llm | in-memory vector index with `sentence-transformers` |
 | `clipwiki` | compiled wiki pages | deterministic, llm | deterministic Markdown wiki baseline with `oracle-curated`, `full-wiki`, and `noisy-curated` modes |
-| `basic-memory` | file-compatible Markdown notes, optional CLI search | deterministic, llm | experimental external adapter with local fallback and best-effort CLI integration |
 
 Compatibility note:
 
@@ -161,6 +160,7 @@ Important note:
 - if the Basic Memory CLI is not installed, the adapter falls back to a local lexical search path
 - this fallback mode is useful for smoke tests and adapter development
 - it is **not** a real Basic Memory benchmark result
+- fallback-mode Basic Memory runs should **not** be included in the main README result table
 
 Always inspect:
 

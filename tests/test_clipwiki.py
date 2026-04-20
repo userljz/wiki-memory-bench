@@ -4,6 +4,7 @@ from typer.testing import CliRunner
 
 from tests.locomo_fixture import build_locomo_record, write_locomo_fixture
 from wiki_memory_bench.datasets import get_dataset
+from wiki_memory_bench.datasets.synthetic_wiki_memory import convert_synthetic_case, generate_synthetic_wiki_memory_cases
 from wiki_memory_bench.cli import app
 from wiki_memory_bench.clipwiki.compiler import compile_clipwiki
 from wiki_memory_bench.datasets.locomo_mc10 import convert_locomo_record
@@ -41,6 +42,19 @@ def test_clipwiki_oracle_curated_uses_session_level_gold_evidence_for_synthetic_
     compiled = compile_clipwiki(example, tmp_path, mode="oracle-curated")
 
     assert compiled.selected_session_ids == ["session-2"]
+
+
+def test_clipwiki_curated_mode_uses_curated_clips_metadata(tmp_path: Path) -> None:
+    case = generate_synthetic_wiki_memory_cases(cases=1, seed=42)[0]
+    example = convert_synthetic_case(case)
+    compiled = compile_clipwiki(example, tmp_path, mode="curated")
+
+    expected_sessions = {
+        session["session_id"]
+        for session in case["sessions"]
+        if any(message["message_id"] in set(case["curated_clips"]) for message in session["messages"])
+    }
+    assert set(compiled.selected_session_ids) == expected_sessions
 
 
 def test_cli_clipwiki_smoke(tmp_path: Path) -> None:

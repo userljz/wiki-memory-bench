@@ -14,6 +14,7 @@ Important benchmarking note:
 - `fallback_local_search` is useful for smoke tests and adapter development
 - it is **not** a real Basic Memory benchmark result
 - only `real_basic_memory` should be interpreted as an actual Basic Memory-backed run
+- fallback-mode results should not be placed in the main README benchmark table
 
 ## Tested Version
 The adapter is currently designed and reviewed against the **Basic Memory v0.19.x CLI contract**, based on the reference repository included under `references/basic-memory/`.

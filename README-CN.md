@@ -143,7 +143,6 @@ uv run wmb datasets prepare longmemeval --split m --sample 50
 | `bm25` | lexical session documents | deterministic, llm | 成本低、完全本地的检索 baseline |
 | `vector-rag` | embedding-based session chunks | deterministic, llm | 使用 `sentence-transformers` 的内存向量索引 |
 | `clipwiki` | compiled wiki pages | deterministic, llm | 确定性 Markdown wiki baseline，支持 `oracle-curated`、`full-wiki`、`noisy-curated` |
-| `basic-memory` | file-compatible Markdown notes, optional CLI search | deterministic, llm | 实验性外部 adapter，默认可退化到本地 fallback，并在安装 CLI 时做 best-effort 集成 |
 
 兼容性说明：
 
@@ -161,6 +160,7 @@ uv run wmb datasets prepare longmemeval --split m --sample 50
 - 如果本机没有安装 Basic Memory CLI，这个 adapter 会自动回退到本地 lexical search
 - 这种 fallback mode 适合 smoke test 和 adapter 开发
 - 但它**不应**被视为“真实的 Basic Memory benchmark 结果”
+- fallback mode 下的 Basic Memory 结果**不应**放入 README 主结果表
 
 请始终先运行：
 

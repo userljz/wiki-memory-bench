@@ -38,10 +38,12 @@ def test_basic_memory_doctor_reports_installed_cli(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr("wiki_memory_bench.systems.basic_memory.subprocess.run", fake_run)
     status = detect_basic_memory_cli()
+    payload = basic_memory_doctor_payload()
 
     assert status.available is True
     assert status.command == "bm"
     assert "0.19.0" in (status.version or "")
+    assert payload["backend_mode"] == "real_basic_memory"
 
 
 def test_basic_memory_adapter_uses_subprocess_when_cli_available(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

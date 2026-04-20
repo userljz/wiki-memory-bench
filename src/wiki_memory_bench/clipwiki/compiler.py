@@ -240,6 +240,12 @@ def select_session_indices(
     if mode == "full-wiki":
         return all_indices
 
+    if mode == "curated":
+        curated_from_clips = _curated_session_indices_from_metadata(example)
+        if curated_from_clips:
+            return curated_from_clips
+        return _gold_or_heuristic_session_indices(example, top_k=curated_top_k)
+
     curated = _gold_or_heuristic_session_indices(example, top_k=curated_top_k)
     if mode == "oracle-curated":
         return curated
@@ -344,6 +350,34 @@ def _gold_or_heuristic_session_indices(example: PreparedExample, top_k: int) -> 
     scores = _bm25_scores(content_tokens(example.question), [content_tokens(text) for text in session_texts])
     ranked = sorted(enumerate(scores), key=lambda item: (-item[1], item[0]))
     return sorted(index for index, _ in ranked[: min(top_k, len(ranked))])
+
+
+def _curated_session_indices_from_metadata(example: PreparedExample) -> list[int]:
+    curated_clip_ids = set(str(value) for value in example.metadata.get("curated_clips", []))
+    if not curated_clip_ids:
+        return []
+
+    selected: set[int] = set()
+    for index, session_turns in enumerate(example.haystack_sessions):
+        session_id = example.haystack_session_ids[index]
+        for turn_index, _turn in enumerate(session_turns):
+            clip_id = f"{example.question_id}:{session_id}:turn-{turn_index}"
+            if clip_id in curated_clip_ids:
+                selected.add(index)
+                break
+
+    if selected:
+        return sorted(selected)
+
+    history_clip_to_session = {clip.clip_id: clip.session_id for clip in example.history_clips}
+    selected_session_ids = {
+        history_clip_to_session[clip_id]
+        for clip_id in curated_clip_ids
+        if clip_id in history_clip_to_session
+    }
+    return sorted(
+        index for index, session_id in enumerate(example.haystack_session_ids) if session_id in selected_session_ids
+    )
 
 
 def _bm25_scores(query_tokens: list[str], documents: list[list[str]], k1: float = 1.5, b: float = 0.75) -> list[float]:

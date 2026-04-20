@@ -28,6 +28,23 @@ def test_synthetic_wiki_memory_cases_have_valid_answers_and_unique_ids() -> None
         assert isinstance(case["memory_operation_labels"], list)
 
 
+def test_all_expected_source_ids_exist_and_stale_sources_do_not_overlap() -> None:
+    cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
+    for case in cases:
+        session_ids = {session["session_id"] for session in case["sessions"]}
+        assert set(case["expected_source_ids"]).issubset(session_ids)
+        assert set(case["stale_source_ids"]).issubset(session_ids)
+        assert not (set(case["expected_source_ids"]) & set(case["stale_source_ids"]))
+
+
+def test_curated_clips_are_present_for_non_abstention_tasks() -> None:
+    cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
+    for case in cases:
+        if case["task_type"] == "abstention":
+            continue
+        assert case["curated_clips"], case["case_id"]
+
+
 def test_synthetic_generate_cli_and_dataset_load(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     monkeypatch.setenv("WMB_HOME", str(tmp_path))

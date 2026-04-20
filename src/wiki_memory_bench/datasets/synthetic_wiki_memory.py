@@ -118,6 +118,7 @@ def convert_synthetic_case(record: dict[str, Any], dataset_name: str = "syntheti
             "curated_clips": list(record.get("curated_clips", [])),
             "expected_source_ids": list(record.get("expected_source_ids", [])),
             "stale_source_ids": list(record.get("stale_source_ids", [])),
+            "source_ids": [str(session["session_id"]) for session in record["sessions"]],
             "memory_operations": list(record.get("memory_operation_labels", [])),
         },
     )
@@ -243,7 +244,6 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
         )
 
     if task_type == "stale_claim_detection":
-        answer = f"No, the old claim is stale. The current launch month is {food.title()}." if False else f"No, the old claim is stale. The current launch month is June 2026."
         sessions = [
             _session(
                 case_number,
@@ -264,7 +264,7 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             task_type=task_type,
             case_number=case_number,
             sessions=sessions,
-            curated_clips=[sessions[1]["messages"][0]["message_id"]],
+            curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
             question=f"Is the wiki claim '{project} launches in May 2026' still current?",
             expected_answer="No, the old claim is stale. The current launch month is June 2026.",
             expected_source_ids=[sessions[1]["session_id"]],
@@ -323,7 +323,7 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             task_type=task_type,
             case_number=case_number,
             sessions=sessions,
-            curated_clips=[sessions[1]["messages"][0]["message_id"]],
+            curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
             question="What indentation style should the wiki preserve as current policy?",
             expected_answer=answer,
             expected_source_ids=[sessions[1]["session_id"]],
@@ -383,7 +383,7 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             task_type=task_type,
             case_number=case_number,
             sessions=sessions,
-            curated_clips=[sessions[0]["messages"][0]["message_id"]],
+            curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
             question="What is the title of the launch note, and which source should support it?",
             expected_answer=answer,
             expected_source_ids=[sessions[0]["session_id"]],
@@ -491,7 +491,7 @@ def _case(
     memory_operations: list[str],
     stale_source_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    return {
+    record = {
         "case_id": f"synthetic-wiki-memory-{task_type}-{case_number:03d}",
         "task_type": task_type,
         "sessions": sessions,
@@ -502,6 +502,45 @@ def _case(
         "stale_source_ids": stale_source_ids or [],
         "memory_operation_labels": memory_operations,
     }
+    validate_synthetic_case(record)
+    return record
+
+
+def validate_synthetic_case(record: dict[str, Any]) -> None:
+    """Validate a generated synthetic case for structural consistency."""
+
+    session_ids = {str(session["session_id"]) for session in record["sessions"]}
+    message_ids = {
+        str(message["message_id"])
+        for session in record["sessions"]
+        for message in session["messages"]
+    }
+
+    expected_source_ids = set(str(value) for value in record.get("expected_source_ids", []))
+    stale_source_ids = set(str(value) for value in record.get("stale_source_ids", []))
+    curated_clips = [str(value) for value in record.get("curated_clips", [])]
+    memory_operations = set(str(value) for value in record.get("memory_operation_labels", []))
+
+    if not record.get("task_type"):
+        raise ValueError("task_type must not be empty")
+    if not record.get("expected_answer"):
+        raise ValueError("expected_answer must not be empty")
+    if not expected_source_ids.issubset(session_ids):
+        raise ValueError("all expected_source_ids must exist in sessions")
+    if not stale_source_ids.issubset(session_ids):
+        raise ValueError("all stale_source_ids must exist in sessions")
+    if expected_source_ids & stale_source_ids:
+        raise ValueError("expected_source_ids and stale_source_ids must not overlap")
+    if any(clip_id not in message_ids for clip_id in curated_clips):
+        raise ValueError("all curated_clips must refer to existing messages")
+    if record["task_type"] != "abstention" and not curated_clips:
+        raise ValueError("curated_clips should be non-empty for non-abstention tasks")
+    if not memory_operations.issubset({"add", "update", "deprecate", "forget", "cite"}):
+        raise ValueError("memory_operation_labels contains unsupported values")
+    if "update" in memory_operations and not expected_source_ids:
+        raise ValueError("update tasks should include expected_source_ids")
+    if "deprecate" in memory_operations and not stale_source_ids:
+        raise ValueError("deprecate tasks should include stale_source_ids")
 
 
 def _session(case_number: int, session_number: int, timestamp: datetime, messages: list[dict[str, Any]], summary: str) -> dict[str, Any]:

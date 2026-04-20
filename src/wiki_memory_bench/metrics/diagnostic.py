@@ -38,4 +38,24 @@ def summarize_diagnostic_metrics(results: list[EvaluatedExampleResult]) -> dict[
     if patch_values:
         metrics["patch_correctness"] = sum(patch_values) / len(patch_values)
 
+    source_coverage_values = []
+    for result in results:
+        expected_source_ids = set(str(value) for value in result.metadata.get("expected_source_ids", []))
+        if not expected_source_ids:
+            continue
+        retrieved_source_ids = set(_extract_source_ids(result))
+        source_coverage_values.append(1.0 if expected_source_ids & retrieved_source_ids else 0.0)
+    if source_coverage_values:
+        metrics["source_coverage"] = sum(source_coverage_values) / len(source_coverage_values)
+
     return metrics
+
+
+def _extract_source_ids(result: EvaluatedExampleResult) -> list[str]:
+    source_ids: list[str] = []
+    for citation in result.citations:
+        if citation.source_ref:
+            source_ids.extend(value.strip() for value in citation.source_ref.split(",") if value.strip())
+            continue
+        source_ids.append(citation.clip_id)
+    return source_ids
