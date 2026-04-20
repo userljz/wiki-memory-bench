@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import builtins
+import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 from typer.testing import CliRunner
 
 from tests.locomo_fixture import write_locomo_fixture
 from wiki_memory_bench.cli import app
 from wiki_memory_bench.datasets.locomo_mc10 import convert_locomo_record
-from wiki_memory_bench.systems.retrieval import InMemoryEmbeddingIndex
+from wiki_memory_bench.systems.retrieval import InMemoryEmbeddingIndex, SentenceTransformerEmbedder
 from wiki_memory_bench.systems.vector_rag import VectorRAGBaseline
 
 
@@ -44,6 +47,21 @@ class FakeEmbedder:
         if norm == 0:
             return vector
         return vector / norm
+
+
+def _block_sentence_transformers_import(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    for module_name in list(sys.modules):
+        if module_name == "sentence_transformers" or module_name.startswith("sentence_transformers."):
+            sys.modules.pop(module_name, None)
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):  # type: ignore[no-untyped-def]
+        if name == "sentence_transformers" or name.startswith("sentence_transformers."):
+            raise ModuleNotFoundError("blocked sentence_transformers import")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
 
 
 def test_embedding_index_caches_repeated_texts() -> None:
@@ -99,6 +117,14 @@ def test_vector_rag_retrieves_relevant_chunk_and_answers() -> None:
     assert prediction.selected_choice_index == 0
     assert prediction.retrieved_items
     assert "Aurora" in prediction.retrieved_items[0].text
+
+
+def test_sentence_transformer_embedder_reports_missing_optional_dependency(monkeypatch) -> None:
+    _block_sentence_transformers_import(monkeypatch)
+    embedder = SentenceTransformerEmbedder(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+    with pytest.raises(RuntimeError, match=r"uv sync --extra vector|wiki-memory-bench\\[vector\\]"):
+        embedder.embed_texts(["hello world"])
 
 
 def test_cli_vector_rag_smoke(tmp_path: Path, monkeypatch) -> None:

@@ -37,12 +37,50 @@ def test_all_expected_source_ids_exist_and_stale_sources_do_not_overlap() -> Non
         assert not (set(case["expected_source_ids"]) & set(case["stale_source_ids"]))
 
 
+def test_expected_source_ids_are_covered_by_curated_clip_sessions_when_present() -> None:
+    cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
+    for case in cases:
+        message_to_session = {
+            message["message_id"]: session["session_id"]
+            for session in case["sessions"]
+            for message in session["messages"]
+        }
+        curated_session_ids = {
+            message_to_session[clip_id]
+            for clip_id in case["curated_clips"]
+            if clip_id in message_to_session
+        }
+        expected_source_ids = set(case["expected_source_ids"])
+
+        if not expected_source_ids:
+            continue
+        assert expected_source_ids.issubset(curated_session_ids), case["case_id"]
+
+
 def test_curated_clips_are_present_for_non_abstention_tasks() -> None:
     cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
     for case in cases:
         if case["task_type"] == "abstention":
             continue
         assert case["curated_clips"], case["case_id"]
+
+
+def test_every_task_type_appears_in_100_case_generation() -> None:
+    cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
+    task_types = {case["task_type"] for case in cases}
+
+    assert task_types == {
+        "direct_recall",
+        "knowledge_update",
+        "stale_claim_detection",
+        "temporal_reasoning",
+        "contradiction_resolution",
+        "selective_forgetting",
+        "citation_required",
+        "preference_following",
+        "multi_session_aggregation",
+        "abstention",
+    }
 
 
 def test_synthetic_generate_cli_and_dataset_load(tmp_path: Path, monkeypatch) -> None:

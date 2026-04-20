@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 
@@ -15,6 +16,10 @@ class MarkdownPage:
     title: str
     content: str
     source_ids: list[str]
+    page_type: str = "source"
+    is_answerable: bool = True
+    search_text: str | None = None
+    timestamp: datetime | None = None
 
 
 class MarkdownStore:

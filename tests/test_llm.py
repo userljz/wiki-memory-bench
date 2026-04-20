@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import builtins
 import json
+import sys
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from tests.locomo_fixture import write_locomo_fixture
@@ -58,6 +61,21 @@ def _fake_completion_cost(*args, **kwargs):  # type: ignore[no-untyped-def]
     return 0.001
 
 
+def _block_litellm_import(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    for module_name in list(sys.modules):
+        if module_name == "litellm" or module_name.startswith("litellm."):
+            sys.modules.pop(module_name, None)
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):  # type: ignore[no-untyped-def]
+        if name == "litellm" or name.startswith("litellm."):
+            raise ModuleNotFoundError("blocked litellm import")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+
+
 def test_litellm_runtime_caches_by_prompt_hash(tmp_path: Path, monkeypatch) -> None:
     calls = {"count": 0}
 
@@ -83,6 +101,20 @@ def test_litellm_runtime_caches_by_prompt_hash(tmp_path: Path, monkeypatch) -> N
     assert first[2]["cached"] is False
     assert second[2]["cached"] is True
     assert list((tmp_path / "artifacts").glob("*.json"))
+
+
+def test_litellm_runtime_reports_missing_optional_dependency(tmp_path: Path, monkeypatch) -> None:
+    _block_litellm_import(monkeypatch)
+    runtime = LiteLLMRuntime(
+        task_name="answerer",
+        model="fake-model",
+        api_key="fake-key",
+        cache_dir=tmp_path / "cache",
+        artifact_dir=tmp_path / "artifacts",
+    )
+
+    with pytest.raises(RuntimeError, match=r"uv sync --extra llm|wiki-memory-bench\\[llm\\]"):
+        runtime.complete_json("test prompt")
 
 
 def test_run_benchmark_supports_llm_judge(monkeypatch, tmp_path: Path) -> None:

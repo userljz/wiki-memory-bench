@@ -61,10 +61,21 @@ class ClipWikiBaseline(SystemAdapter):
                 clip_id=page.page_id,
                 rank=index + 1,
                 score=float(scores.get(page.page_id, 0.0)),
-                text=page.content,
-                retrieved_tokens=estimate_text_tokens(page.content),
+                text=page.search_text or page.content,
+                retrieved_tokens=estimate_text_tokens(page.search_text or page.content),
             )
             for index, page in enumerate(retrieved_pages)
+        ]
+        answerable_pages = [page for page in retrieved_pages if page.is_answerable]
+        answer_items = [
+            RetrievedItem(
+                clip_id=page.page_id,
+                rank=index + 1,
+                score=float(scores.get(page.page_id, 0.0)),
+                text=page.search_text or page.content,
+                retrieved_tokens=estimate_text_tokens(page.search_text or page.content),
+            )
+            for index, page in enumerate(answerable_pages)
         ]
 
         page_map = {page.page_id: page for page in compiled_wiki.pages}
@@ -73,7 +84,7 @@ class ClipWikiBaseline(SystemAdapter):
         latency_ms = (perf_counter() - started) * 1000.0
 
         if example.task_type == TaskType.MULTIPLE_CHOICE:
-            selection = self.answerer.select_choice(example, retrieved_items)
+            selection = self.answerer.select_choice(example, answer_items or retrieved_items)
             selected_choice = selection.choice
             supporting_item = selection.supporting_item
             confidence = selection.confidence
@@ -81,9 +92,21 @@ class ClipWikiBaseline(SystemAdapter):
             supporting_page = page_map.get(supporting_item.clip_id) if supporting_item is not None else None
             for page in retrieved_pages:
                 if page.page_id in citation_ids:
-                    citations.append(Citation(clip_id=page.page_id, source_ref=",".join(page.source_ids), quote=page.content))
+                    citations.append(
+                        Citation(
+                            clip_id=page.page_id,
+                            source_ref=",".join(page.source_ids),
+                            quote=page.search_text or page.content,
+                        )
+                    )
             if not citations and supporting_page is not None:
-                citations.append(Citation(clip_id=supporting_page.page_id, source_ref=",".join(supporting_page.source_ids), quote=supporting_page.content))
+                citations.append(
+                    Citation(
+                        clip_id=supporting_page.page_id,
+                        source_ref=",".join(supporting_page.source_ids),
+                        quote=supporting_page.search_text or supporting_page.content,
+                    )
+                )
 
             input_tokens = estimate_token_total(
                 [item.text for item in retrieved_items] + [example.question] + [choice.text for choice in example.choices]
@@ -118,16 +141,28 @@ class ClipWikiBaseline(SystemAdapter):
                 },
             )
 
-        selection = self.open_qa_answerer.answer_question(example, retrieved_items)
+        selection = self.open_qa_answerer.answer_question(example, answer_items)
         supporting_item = selection.supporting_item
         confidence = selection.confidence
         citation_ids = set(selection.citation_ids or ([supporting_item.clip_id] if supporting_item is not None else []))
         supporting_page = page_map.get(supporting_item.clip_id) if supporting_item is not None else None
         for page in retrieved_pages:
             if page.page_id in citation_ids:
-                citations.append(Citation(clip_id=page.page_id, source_ref=",".join(page.source_ids), quote=page.content))
+                citations.append(
+                    Citation(
+                        clip_id=page.page_id,
+                        source_ref=",".join(page.source_ids),
+                        quote=page.search_text or page.content,
+                    )
+                )
         if not citations and supporting_page is not None:
-            citations.append(Citation(clip_id=supporting_page.page_id, source_ref=",".join(supporting_page.source_ids), quote=supporting_page.content))
+            citations.append(
+                Citation(
+                    clip_id=supporting_page.page_id,
+                    source_ref=",".join(supporting_page.source_ids),
+                    quote=supporting_page.search_text or supporting_page.content,
+                )
+            )
 
         input_tokens = estimate_token_total([item.text for item in retrieved_items] + [example.question])
         output_tokens = estimate_text_tokens(selection.answer_text)

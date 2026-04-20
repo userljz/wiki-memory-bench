@@ -11,6 +11,13 @@ import numpy as np
 from wiki_memory_bench.schemas import HistoryClip, PreparedExample
 
 
+def _missing_vector_dependency_error() -> RuntimeError:
+    return RuntimeError(
+        "Vector RAG requires the optional vector dependencies. "
+        'Install them with `uv sync --extra vector` or `pip install "wiki-memory-bench[vector]"`.'
+    )
+
+
 class TextEmbedder(Protocol):
     """Minimal protocol for text embedding backends."""
 
@@ -39,7 +46,10 @@ class SentenceTransformerEmbedder:
 
     def _load_model(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ModuleNotFoundError as error:
+                raise _missing_vector_dependency_error() from error
 
             self._model = SentenceTransformer(self.model_name, cache_folder=self.cache_folder)
         return self._model

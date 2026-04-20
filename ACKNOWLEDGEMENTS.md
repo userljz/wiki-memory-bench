@@ -68,7 +68,7 @@ This project reimplements its own benchmark harness and baseline code, but it dr
 - The benchmark CLI, schemas, terminal UX, and test workflow are built on these tools
 
 ## Licensing Notes
-This repository does not yet include its own finalized project license.
+The code in this repository is released under the MIT License. See the root `LICENSE` file.
 
 Dataset licenses and usage terms vary. Before public release or redistribution, verify the licenses of:
 
@@ -77,6 +77,8 @@ Dataset licenses and usage terms vary. Before public release or redistribution, 
 - any future datasets or adapters you add
 
 Do not assume that every referenced dataset is suitable for every commercial or redistribution setting.
+
+Referenced external projects and infrastructure libraries remain under their own licenses.
 
 ## Thanks
 Thanks to the maintainers and authors of the public datasets and memory-system projects that made this space legible enough to benchmark seriously.

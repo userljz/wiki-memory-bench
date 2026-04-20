@@ -3,16 +3,46 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import os
 import time
 from pathlib import Path
 from typing import Any
 
-from litellm import completion, completion_cost
-
 from wiki_memory_bench.schemas import TokenUsage
 from wiki_memory_bench.utils.paths import ensure_runtime_dirs, llm_cache_dir
+
+
+class MissingLLMDependencyError(RuntimeError):
+    """Raised when optional llm dependencies are not installed."""
+
+
+def _missing_litellm_dependency_error() -> MissingLLMDependencyError:
+    return MissingLLMDependencyError(
+        "LLM features require the optional llm dependencies. "
+        'Install them with `uv sync --extra llm` or `pip install "wiki-memory-bench[llm]"`.'
+    )
+
+
+def completion(*args: Any, **kwargs: Any) -> Any:
+    """Call LiteLLM lazily so importing the package does not require it."""
+
+    try:
+        litellm_module = importlib.import_module("litellm")
+    except ModuleNotFoundError as error:
+        raise _missing_litellm_dependency_error() from error
+    return litellm_module.completion(*args, **kwargs)
+
+
+def completion_cost(*args: Any, **kwargs: Any) -> Any:
+    """Call LiteLLM pricing helpers lazily for optional LLM flows."""
+
+    try:
+        litellm_module = importlib.import_module("litellm")
+    except ModuleNotFoundError as error:
+        raise _missing_litellm_dependency_error() from error
+    return litellm_module.completion_cost(*args, **kwargs)
 
 
 class LiteLLMRuntime:
@@ -118,6 +148,8 @@ class LiteLLMRuntime:
                     "artifact_path": self._write_artifact(request_hash, prompt, record),
                 }
                 return parsed, usage, metadata
+            except MissingLLMDependencyError:
+                raise
             except Exception as error:  # pragma: no cover - retry branch depends on backend failure
                 last_error = error
                 if attempt >= self.max_retries:

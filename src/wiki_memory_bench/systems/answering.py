@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 from typing import Sequence
 
 import numpy as np
@@ -14,6 +15,12 @@ from wiki_memory_bench.systems.base import is_abstention_choice
 from wiki_memory_bench.systems.retrieval import InMemoryEmbeddingIndex
 from wiki_memory_bench.utils.llm import LiteLLMRuntime
 from wiki_memory_bench.utils.tokens import content_tokens, normalize_text
+
+ABSTENTION_ANSWER = "Not enough information in memory."
+METADATA_LINE_PREFIXES = ("Question:", "Tags:", "Concept:", "Why saved:", "Summary:", "Source:", "Evidence:")
+PRIMARY_EVIDENCE_PREFIXES = ("sources/", "evidence/", "preferences/")
+NAVIGATION_PREFIXES = ("concepts/", "people/", "events/", "index", "log")
+FORGETTING_CUES = ("remove", "forget", "forgot", "do not keep", "don't keep", "temporary", "after use", "no longer")
 
 
 @dataclass(slots=True)
@@ -40,6 +47,15 @@ class OpenQASelection:
     citation_ids: list[str] = field(default_factory=list)
     token_usage: TokenUsage = field(default_factory=TokenUsage)
     metadata: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class OpenQACandidate:
+    """Single deterministic open-QA answer candidate."""
+
+    snippet: str
+    item: RetrievedItem
+    score: float
 
 
 class DeterministicMultipleChoiceAnswerer:
@@ -220,28 +236,52 @@ class DeterministicOpenQAAnswerer:
         retrieved_items: Sequence[RetrievedItem],
     ) -> OpenQASelection:
         if not retrieved_items:
-            return OpenQASelection(answer_text="", supporting_item=None, confidence=0.0)
+            return OpenQASelection(answer_text=ABSTENTION_ANSWER, supporting_item=None, confidence=0.0)
 
         question_tokens = set(content_tokens(example.question))
-        best_item = retrieved_items[0]
-        best_snippet = best_item.text
-        best_score = float("-inf")
+        max_retrieval_score = max((item.score for item in retrieved_items), default=1.0) or 1.0
+        candidates: list[OpenQACandidate] = []
 
         for item in retrieved_items:
             for snippet in _candidate_snippets(item.text):
-                snippet_tokens = set(content_tokens(snippet))
-                overlap = len(question_tokens & snippet_tokens)
-                score = overlap * 2.0 + (item.score if item.score > 0 else 0.0)
-                if score > best_score:
-                    best_score = score
-                    best_item = item
-                    best_snippet = _format_open_answer(example.question, snippet)
+                score = _score_open_qa_candidate(
+                    question_tokens=question_tokens,
+                    snippet=snippet,
+                    item=item,
+                    max_retrieval_score=max_retrieval_score,
+                )
+                if score > 0.0:
+                    candidates.append(OpenQACandidate(snippet=snippet, item=item, score=score))
+
+        if not candidates:
+            return OpenQASelection(answer_text=ABSTENTION_ANSWER, supporting_item=None, confidence=0.0)
+
+        candidates.sort(key=lambda candidate: (-candidate.score, candidate.item.rank, candidate.item.clip_id, candidate.snippet))
+        best_candidate = candidates[0]
+
+        if _should_abstain_from_candidate(example.question, best_candidate):
+            return OpenQASelection(
+                answer_text=ABSTENTION_ANSWER,
+                supporting_item=best_candidate.item,
+                confidence=best_candidate.score,
+                citation_ids=[best_candidate.item.clip_id],
+            )
+
+        if _is_multi_snippet_question(example.question):
+            combined_answer, combined_items = _combine_open_qa_candidates(candidates)
+            if combined_answer is not None and combined_items:
+                return OpenQASelection(
+                    answer_text=_format_open_answer(example.question, combined_answer),
+                    supporting_item=combined_items[0],
+                    confidence=sum(candidate.score for candidate in candidates[: len(combined_items)]),
+                    citation_ids=[item.clip_id for item in combined_items],
+                )
 
         return OpenQASelection(
-            answer_text=best_snippet,
-            supporting_item=best_item,
-            confidence=best_score,
-            citation_ids=[best_item.clip_id],
+            answer_text=_format_open_answer(example.question, best_candidate.snippet),
+            supporting_item=best_candidate.item,
+            confidence=best_candidate.score,
+            citation_ids=[best_candidate.item.clip_id],
         )
 
 
@@ -329,10 +369,15 @@ def build_open_qa_answerer(mode: str, *, task_name: str = "open-qa-answerer") ->
 
 
 def _candidate_snippets(text: str) -> list[str]:
-    lines = [line.strip("- ").strip() for line in text.splitlines() if line.strip()]
+    lines = [_normalize_candidate_line(line) for line in text.splitlines() if line.strip()]
     snippets: list[str] = []
     for line in lines:
-        snippets.extend([part.strip() for part in line.replace("?", ".").split(".") if part.strip()])
+        if not line:
+            continue
+        if _is_metadata_line(line) or line.startswith("#") or line.startswith("[["):
+            continue
+        snippets.append(line)
+        snippets.extend([part.strip() for part in re.split(r"[.;]\s+", line) if part.strip() and part.strip() != line])
     return snippets or [text.strip()]
 
 
@@ -343,3 +388,95 @@ def _format_open_answer(question: str, snippet: str) -> str:
     if lowered_question.startswith(("what ", "which ", "who ", "where ", "how ")):
         return snippet
     return snippet
+
+
+def _score_open_qa_candidate(
+    *,
+    question_tokens: set[str],
+    snippet: str,
+    item: RetrievedItem,
+    max_retrieval_score: float,
+) -> float:
+    snippet_tokens = set(content_tokens(snippet))
+    if not snippet_tokens:
+        return 0.0
+
+    overlap = len(question_tokens & snippet_tokens)
+    if overlap == 0 and not _looks_answer_bearing(snippet):
+        return 0.0
+
+    normalized_retrieval = max(0.0, item.score) / max_retrieval_score
+    return (
+        overlap * 2.0
+        + normalized_retrieval * 0.75
+        + _page_type_bonus(item.clip_id)
+        + (0.75 if _looks_answer_bearing(snippet) else 0.0)
+        + (0.5 if _looks_like_speaker_evidence(snippet) else 0.0)
+    )
+
+
+def _page_type_bonus(clip_id: str) -> float:
+    if clip_id.startswith(PRIMARY_EVIDENCE_PREFIXES):
+        return 1.5
+    if clip_id.startswith(NAVIGATION_PREFIXES) or clip_id in NAVIGATION_PREFIXES:
+        return -2.0
+    return 0.0
+
+
+def _looks_answer_bearing(snippet: str) -> bool:
+    lowered = normalize_text(snippet)
+    if re.search(r"\b\d{4}-\d{2}-\d{2}\b", snippet):
+        return True
+    return any(token in lowered for token in (" is ", " are ", " was ", " moved ", " update ", " current ", " favorite ", " prefer", ":"))
+
+
+def _looks_like_speaker_evidence(snippet: str) -> bool:
+    return bool(re.match(r"^[A-Za-z][A-Za-z\s'\-]{0,40}:\s+\S", snippet))
+
+
+def _is_metadata_line(line: str) -> bool:
+    normalized = _normalize_candidate_line(line)
+    if any(normalized.startswith(prefix) for prefix in METADATA_LINE_PREFIXES):
+        return True
+    if normalized.startswith(("## ", "# ")):
+        return True
+    return normalized in {"Supports", "Source Pages", "Relevant Sources", "Relevant Evidence Pages"}
+
+
+def _normalize_candidate_line(line: str) -> str:
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", line)
+    return cleaned.strip().lstrip("-").strip()
+
+
+def _should_abstain_from_candidate(question: str, candidate: OpenQACandidate) -> bool:
+    normalized_snippet = normalize_text(candidate.snippet)
+    if candidate.score < 1.5:
+        return True
+    if any(cue in normalized_snippet for cue in FORGETTING_CUES):
+        return True
+    return "not enough information" in normalized_snippet or "unknown" in normalized_snippet
+
+
+def _is_multi_snippet_question(question: str) -> bool:
+    lowered = normalize_text(question)
+    return any(token in lowered for token in (" two ", " both ", " aggregate ", " new things "))
+
+
+def _combine_open_qa_candidates(candidates: Sequence[OpenQACandidate]) -> tuple[str | None, list[RetrievedItem]]:
+    selected: list[OpenQACandidate] = []
+    seen_clip_ids: set[str] = set()
+    for candidate in candidates:
+        if candidate.item.clip_id in seen_clip_ids:
+            continue
+        if _should_abstain_from_candidate("", candidate):
+            continue
+        selected.append(candidate)
+        seen_clip_ids.add(candidate.item.clip_id)
+        if len(selected) == 2:
+            break
+
+    if len(selected) < 2:
+        return None, []
+
+    combined_answer = " and ".join(candidate.snippet.rstrip(".") for candidate in selected)
+    return combined_answer, [candidate.item for candidate in selected]

@@ -1,63 +1,46 @@
 # Wiki-Memory-Bench
 
-Benchmark and evaluation harness for Markdown/Wiki-style long-term memory systems for LLM agents.
+Benchmark Markdown/Wiki memory systems for LLM agents.
 
-## Why This Exists
-Most memory benchmarks focus on generic retrieval, context stuffing, or agent runtime behavior. That is useful, but it misses a specific class of systems that many AI engineers are now building:
+> v0.1-alpha. Honest, serious, engineering-focused evaluation for teams building agent memory systems.
 
-- local Markdown memory stores
-- wiki-style persistent memory
-- human-curated clips instead of full raw logs
-- update and maintenance workflows rather than retrieval alone
+## What Problem It Solves
 
-`wiki-memory-bench` exists to measure those systems directly. The goal is not only to ask whether a system can answer a question, but whether it can maintain a useful memory substrate over time:
+Agent memory systems often claim they can:
 
-- what it saves
-- what it updates
-- what it marks stale
-- what it forgets
-- what it cites
+- remember facts over time
+- update stale facts
+- cite where an answer came from
+- forget temporary or unsafe information
+
+Those claims are especially common for wiki-style or Markdown-first memory systems, where the promise is inspectable, editable, local state instead of opaque hidden memory.
+
+`wiki-memory-bench` exists to make that claim testable. It provides a reproducible CLI harness that normalizes datasets, runs comparable baselines, saves artifacts under `runs/`, and reports answer accuracy, citation precision, token usage, latency, and diagnostic metadata.
 
 ## What Makes It Different
-Four design choices define this project:
 
-### Markdown / Wiki memory systems
-This project is centered on systems that compile memory into local Markdown or wiki-like artifacts, not just vector stores or opaque agent state.
+- `Markdown / Wiki memory`: The benchmark is designed for systems that compile or maintain memory as Markdown pages, wiki notes, or similar local artifacts.
+- `Human-curated clips`: It can evaluate memory built from selected clips or sessions, not only full raw histories.
+- `Stale-claim and update diagnostics`: Synthetic tasks exercise updates, contradictions, stale claims, and forgetting behavior.
+- `Citation precision`: It tracks whether a system cites relevant evidence rather than only answering correctly.
+- `Token and latency tracking`: Each run records retrieval cost, token estimates, and latency so practical trade-offs stay visible.
+- `Reproducible CLI harness`: Runs are driven by `uv` + Typer CLI, normalized adapters, saved artifacts, and explicit reports.
 
-### Human-curated clips
-The benchmark explicitly supports curated memory inputs: the clips or sessions a human would actually choose to preserve, not only the full original conversation.
+## 5-Minute Quickstart
 
-### Update / stale / citation metrics
-The harness tracks more than answer accuracy. It is designed to evaluate:
+### Core path, no API key
 
-- updates and knowledge changes
-- stale claim handling
-- citation quality
-- forgetting behavior
-- wiki artifact size and retrieval cost
-
-### Reproducible harness
-Everything is local-first and scriptable:
-
-- `uv`
-- Typer CLI
-- JSONL prepared data
-- saved run artifacts under `runs/`
-- deterministic baselines by default
-- optional LiteLLM-based answerer and judge when needed
-
-Default quickstart does not require API keys.
-
-## Quickstart
-### Install
+This is the fastest path to a real run and report.
 
 ```bash
 uv sync
 uv run wmb datasets list
 uv run wmb systems list
+uv run wmb run --dataset synthetic-mini --system bm25 --limit 5
+uv run wmb report runs/latest
 ```
 
-### Run the synthetic wiki-memory benchmark
+If you want a slightly richer no-key diagnostic run:
 
 ```bash
 uv run wmb synthetic generate --cases 100 --out data/synthetic/wiki_memory_100.jsonl
@@ -65,69 +48,62 @@ uv run wmb run --dataset synthetic-wiki-memory --system clipwiki --limit 50
 uv run wmb report runs/latest
 ```
 
-### Experimental external adapter: Basic Memory
+### Optional vector path
+
+Install the optional vector stack only if you want `vector-rag`.
 
 ```bash
-uv tool install basic-memory
-uv run wmb systems doctor basic-memory
-uv run wmb run --dataset synthetic-wiki-memory --system basic-memory --limit 20
-```
-
-### Run the LoCoMo-MC10 benchmark
-
-```bash
+uv sync --extra vector
 uv run wmb datasets prepare locomo-mc10 --limit 20
-uv run wmb run --dataset locomo-mc10 --system bm25 --limit 20
 uv run wmb run --dataset locomo-mc10 --system vector-rag --limit 20
-uv run wmb run --dataset locomo-mc10 --system clipwiki --mode oracle-curated --limit 20
 uv run wmb report runs/latest
 ```
 
-### Optional LLM answerer / judge
+### Optional LLM path
+
+Install the optional LLM stack only if you want LLM answerers or LLM judges.
 
 ```bash
+uv sync --extra llm
 export LLM_MODEL="openai/gpt-4o-mini"
 export LLM_API_KEY="your-api-key"
-# Optional for OpenRouter or local OpenAI-compatible servers
+# Optional for OpenRouter or local OpenAI-compatible endpoints
 export LLM_BASE_URL="http://localhost:8000/v1"
 
 uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge llm --limit 20
 uv run wmb report runs/latest --show-prompts
 ```
 
-### Run the LongMemEval-cleaned benchmark
+## v0.1-alpha Results
 
-```bash
-uv run wmb datasets prepare longmemeval --split s --limit 20
-uv run wmb run --dataset longmemeval-s --system bm25 --limit 20
-uv run wmb run --dataset longmemeval-s --system clipwiki --mode full-wiki --limit 20
-uv run wmb report runs/latest
-```
+The current reproducible alpha report is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md). It includes commit hash, environment, exact commands, run IDs, oracle labels, dependency modes, and failure analysis.
 
-## Example Output Table
-Reproducible v0.1-alpha example runs. Full results live in [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md) and are generated by [`scripts/reproduce_v0_1_alpha.sh`](scripts/reproduce_v0_1_alpha.sh).
+This table is intentionally conservative:
 
-| Dataset | System | Mode | Answerer | Accuracy | Avg Retrieved Tokens | Avg Latency |
-| --- | --- | --- | --- | ---: | ---: | ---: |
-| `synthetic-mini` | `bm25` | default | deterministic | 100.00% | 37.40 | 0.11 ms |
-| `synthetic-wiki-memory` | `bm25` | default | deterministic | 50.00% | 41.94 | 0.04 ms |
-| `synthetic-wiki-memory` | `clipwiki` | default | deterministic | 10.00% | 202.16 | 16.87 ms |
-| `locomo-mc10` | `bm25` | default | deterministic | 28.00% | 2189.48 | 3.13 ms |
-| `locomo-mc10` | `vector-rag` | default | deterministic | 22.00% | 765.40 | 870.27 ms |
-| `locomo-mc10` | `clipwiki` | `full-wiki` | deterministic | 32.00% | 3447.58 | 88.00 ms |
+- it mixes smoke rows and limited-slice alpha rows
+- it is not a final scientific leaderboard
+- it does **not** prove that `clipwiki` is generally better than `vector-rag`
+
+| Dataset | System | Limit | Accuracy | Citation Precision | Limitation / Note |
+| --- | --- | ---: | ---: | ---: | --- |
+| `synthetic-mini` | `bm25` | 5 | 100.00% | 80.00% | Built-in smoke benchmark only. |
+| `synthetic-wiki-memory` | `bm25` | 50 | 70.00% | 50.00% | Deterministic diagnostic row, not a paper-quality leaderboard result. |
+| `synthetic-wiki-memory` | `clipwiki` | 50 | 70.00% | 60.00% | Evidence-first deterministic alpha row. |
+| `locomo-mc10` | `bm25` | 50 | 28.00% | 4.00% | Weak grounding on this alpha slice. |
+| `locomo-mc10` | `clipwiki` | 50 | 30.00% | 4.00% | Non-oracle `full-wiki` row; still weak on grounding. |
+
+`vector-rag` is supported, but in the current reproducibility environment the alpha report marks it `skipped` because the optional `vector` extra was not installed. That is why this README does not make any claim that `clipwiki` beats `vector-rag`.
 
 ## Supported Datasets
-| Dataset Alias | Task Style | Status | Notes |
-| --- | --- | --- | --- |
-| `synthetic-mini` | multiple-choice | stable | built-in smoke suite for fast sanity checks |
-| `synthetic-wiki-memory` | open QA diagnostics | stable | generated deterministic wiki-memory maintenance tasks |
-| `locomo-mc10` | 10-choice QA | stable | backed by `Percena/locomo-mc10` |
-| `longmemeval-s` | open QA | stable | first supported `LongMemEval-cleaned` split |
-| `longmemeval-m` | open QA | experimental | larger and slower split |
-| `longmemeval-oracle` | open QA | experimental | oracle retrieval subset |
-| `longmemeval` | prepare alias | stable | use `--split s|m|oracle` when preparing |
 
-Dataset commands:
+| Dataset | Alias / Command | Status | Notes |
+| --- | --- | --- | --- |
+| Synthetic Mini | `synthetic-mini` | Stable | Built-in five-case smoke benchmark for fast sanity checks. |
+| Synthetic Wiki Memory | `synthetic-wiki-memory` | Stable | Deterministic open-QA diagnostics for update, stale-claim, citation, aggregation, and forgetting behavior. |
+| LoCoMo-MC10 | `locomo-mc10` | Stable | 10-choice long-conversation QA backed by `Percena/locomo-mc10`. |
+| LongMemEval-cleaned | `longmemeval-s`, `longmemeval-m`, `longmemeval-oracle` | Experimental to stable by split | Current support focuses on the cleaned release and normalized preparation flow. |
+
+Common dataset commands:
 
 ```bash
 uv run wmb datasets prepare locomo-mc10 --limit 20
@@ -135,85 +111,39 @@ uv run wmb datasets prepare longmemeval --split s --limit 20
 uv run wmb datasets prepare longmemeval --split m --sample 50
 ```
 
-## Supported Memory Systems
-| System | Retrieval Unit | Answerer Modes | Notes |
-| --- | --- | --- | --- |
-| `full-context-oracle` | full history | deterministic, llm | sanity upper bound; deterministic mode uses the gold choice and is not a fair deployable baseline |
-| `full-context-heuristic` | full history | deterministic, llm | non-oracle full-context heuristic using the same deterministic answerer family as retrieval baselines |
-| `bm25` | lexical session documents | deterministic, llm | cheap local retrieval baseline |
-| `vector-rag` | embedding-based session chunks | deterministic, llm | in-memory vector index with `sentence-transformers` |
-| `clipwiki` | compiled wiki pages | deterministic, llm | deterministic Markdown wiki baseline with `oracle-curated`, `full-wiki`, and `noisy-curated` modes |
+## Supported Systems
 
-Compatibility note:
+| System | Public Name | Notes |
+| --- | --- | --- |
+| BM25 | `bm25` | Cheap local lexical baseline over session documents. |
+| Vector RAG | `vector-rag` | Local embedding retrieval baseline; requires the optional `vector` extra. |
+| ClipWiki | `clipwiki` | Deterministic wiki-style baseline that compiles source/evidence pages and retrieves them. |
+| FullContext Oracle Upper Bound | `full-context-oracle` | Oracle upper bound. Deterministic mode uses gold labels and is **not** a fair deployable baseline. |
+| Experimental external adapters | `basic-memory` today | External integrations are useful for engineering evaluation, but may run in fallback mode and should be reported honestly. |
 
-- `full-context` is kept as a backward-compatible alias to `full-context-oracle`
-
-`full-context-oracle` is useful as a sanity upper bound, but it should **not** be compared directly as a fair retrieval or memory-system baseline.
-
-## Experimental External Adapters
-Current experimental external adapter:
-
-- `basic-memory`
-
-Important note:
-
-- if the Basic Memory CLI is not installed, the adapter falls back to a local lexical search path
-- this fallback mode is useful for smoke tests and adapter development
-- it is **not** a real Basic Memory benchmark result
-- fallback-mode Basic Memory runs should **not** be included in the main README result table
-
-Always inspect:
-
-```bash
-uv run wmb systems doctor basic-memory
-```
-
-to confirm whether the run is using:
-
-- `real_basic_memory`
-- `fallback_local_search`
-
-To run real integration tests for the adapter:
-
-```bash
-export WMB_RUN_BASIC_MEMORY_INTEGRATION=1
-uv run pytest tests/test_basic_memory.py
-```
-
-`vector-rag` defaults:
-
-- embedding model: `sentence-transformers/all-MiniLM-L6-v2`
-- override with `WMB_VECTOR_RAG_MODEL`
-- retrieval depth override with `WMB_VECTOR_RAG_TOP_K`
+Additional compatibility note: `full-context` remains a backward-compatible alias for `full-context-oracle`.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    rawData[RawDatasetsAndSyntheticTemplates] --> prepareCli[DatasetPrepareCLI]
-    prepareCli --> preparedCases[PreparedEvalCases]
-    preparedCases --> adapters[MemorySystemAdapters]
-    adapters --> artifacts[PredictionsRetrievalAndWikiArtifacts]
-    artifacts --> metrics[DeterministicMetricsAndOptionalLLMJudge]
-    metrics --> runStore[RunStore]
-    runStore --> reportCli[RichCLIReport]
+    raw[Raw datasets and synthetic generators] --> prepare[Dataset adapters / prepare CLI]
+    prepare --> cases[Normalized evaluation cases]
+    cases --> systems[Memory system adapters]
+    systems --> artifacts[Predictions, citations, retrieval traces, wiki artifacts]
+    artifacts --> metrics[Deterministic metrics and optional LLM judge]
+    metrics --> runs[Run store under runs/]
+    runs --> report[CLI report and reproducible alpha reports]
 ```
 
-The important contract is simple:
+## How To Add a Memory System
 
-1. normalize every dataset into a common case schema
-2. run every memory system through a shared adapter interface
-3. score from stored artifacts, not ad hoc prompt logs
-
-## How To Add A New Memory System Adapter
-Short version:
-
-1. Add a new module under `src/wiki_memory_bench/systems/`
-2. Subclass `SystemAdapter`
-3. Implement `run()` and optionally `prepare_run()` / `finalize_run()`
-4. Return a `SystemResult`
-5. Register with `@register_system`
-6. Add tests and a CLI smoke path
+1. Add a module under `src/wiki_memory_bench/systems/`.
+2. Subclass `SystemAdapter`.
+3. Implement `run()` and optional `prepare_run()` / `finalize_run()`.
+4. Register it with `@register_system`.
+5. Add focused regression tests, not only a smoke path.
+6. Add at least one CLI runnable path that persists artifacts under `runs/`.
 
 Minimal shape:
 
@@ -230,17 +160,16 @@ class MyMemorySystem(SystemAdapter):
         ...
 ```
 
-See `docs/adapter-guide.md` for the full checklist, expected artifacts, and testing conventions.
+See `docs/adapter-guide.md` for a fuller checklist.
 
-## How To Add A New Dataset
-Short version:
+## How To Add a Dataset
 
-1. Add a module under `src/wiki_memory_bench/datasets/`
-2. Subclass `DatasetAdapter`
-3. Convert raw records into `EvalCase`
-4. Preserve timestamps, evidence metadata, and source references if available
-5. Register with `@register_dataset`
-6. Add fixture-backed tests and a CLI prepare smoke test
+1. Add a module under `src/wiki_memory_bench/datasets/`.
+2. Subclass `DatasetAdapter`.
+3. Convert raw data into the normalized `EvalCase` schema.
+4. Preserve timestamps, evidence metadata, source references, and split information where possible.
+5. Register it with `@register_dataset`.
+6. Add fixture-backed tests plus a CLI prepare smoke path.
 
 Minimal shape:
 
@@ -254,48 +183,30 @@ class MyDataset(DatasetAdapter):
         ...
 ```
 
-See `docs/dataset-guide.md` for the normalized schema rules, split handling, and fixture strategy.
+See `docs/dataset-guide.md` for the schema contract and split handling rules.
 
 ## Roadmap
-Near-term priorities:
 
-- strengthen deterministic open-QA answer extraction for `LongMemEval`
-- add `markdown-summary` baseline
-- improve evidence-aware citation coverage metrics
-- add stronger synthetic maintenance and patch correctness evaluation
-- benchmark `longmemeval-m` and `longmemeval-oracle` more thoroughly
-- improve `clipwiki` compilation heuristics for updates and stale claims
+- Improve deterministic open-QA extraction on `LongMemEval-cleaned`.
+- Add stronger maintenance / patch correctness diagnostics.
+- Improve evidence-aware citation metrics and report exports.
+- Expand benchmark coverage for `longmemeval-m` and `longmemeval-oracle`.
+- Continue improving `clipwiki` compilation and retrieval heuristics for update/staleness scenarios.
+- Add more experimental external adapters with honest dependency and fallback reporting.
 
-Planned extension points:
+## Known Limitations
 
-- external adapters for `basic-memory`, `agentmemory`, `llm-wiki-skill`, `Mem0`, and `Zep`
-- richer report exports and publication-ready experiment tables
-- a formal technical report based on `docs/technical-report-outline.md`
+- This is `v0.1-alpha`, not a final benchmark release.
+- Some rows are small-limit smoke or alpha slices rather than exhaustive experiments.
+- Deterministic answerers are useful for reproducibility, but they can understate or overstate what stronger learned answerers would do.
+- Optional systems such as `vector-rag` and LLM modes depend on extra dependencies or API configuration.
+- Experimental external adapters may run in fallback mode; those results should not be presented as full integration benchmarks.
+- Current public alpha reporting is strongest on reproducibility and honesty, not on breadth of benchmark coverage.
 
-## Citation / Acknowledgements
-If you use this repository in research or product evaluation, cite the repository URL and the exact commit you used until a formal technical report or release DOI exists.
+## License and Acknowledgements
 
-Related datasets, systems, and libraries are acknowledged in `ACKNOWLEDGEMENTS.md`.
+The code in this repository is licensed under the MIT License. See `LICENSE`.
 
-Supporting design and planning docs:
+Benchmarked datasets keep their own licenses, usage terms, and redistribution constraints. External projects and third-party libraries also keep their own licenses.
 
-- `docs/research-notes.md`
-- `docs/architecture.md`
-- `docs/dataset-strategy.md`
-- `docs/mvp-plan.md`
-- `docs/non-goals.md`
-- `docs/technical-report-outline.md`
-- `docs/adapter-guide.md`
-- `docs/basic-memory-adapter.md`
-- `docs/dataset-guide.md`
-
-## License
-This repository does not yet include a finalized project license file.
-
-Before public release, add a root `LICENSE` file and make sure it is compatible with:
-
-- the intended use of this codebase
-- the licenses and terms of the public datasets you benchmark
-- any downstream redistribution plans
-
-See `ACKNOWLEDGEMENTS.md` and the original dataset cards for dataset-specific license details.
+See `ACKNOWLEDGEMENTS.md` for related datasets, systems, and libraries, and see the original dataset cards for dataset-specific license details.
