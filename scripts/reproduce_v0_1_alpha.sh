@@ -98,9 +98,11 @@ import os
 import shlex
 from pathlib import Path
 
-summary_path = Path("runs/latest/summary.json")
-manifest_path = Path("runs/latest/manifest.json")
-predictions_path = Path("runs/latest/predictions.jsonl")
+benchmark_home = Path(os.environ.get("WMB_HOME", ".")).expanduser().resolve()
+latest_run_dir = benchmark_home / "runs" / "latest"
+summary_path = latest_run_dir / "summary.json"
+manifest_path = latest_run_dir / "manifest.json"
+predictions_path = latest_run_dir / "predictions.jsonl"
 
 summary = json.loads(summary_path.read_text(encoding="utf-8"))
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
