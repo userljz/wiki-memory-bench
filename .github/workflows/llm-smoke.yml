@@ -1,0 +1,70 @@
+name: LLM Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      llm_model:
+        description: "LLM model name. If omitted, falls back to repository variable LLM_MODEL."
+        required: false
+        type: string
+      llm_limit:
+        description: "Per-row example limit for the smoke run."
+        required: false
+        default: "20"
+        type: string
+      run_longmemeval_llm:
+        description: "Include optional longmemeval-s LLM rows."
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  llm-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      WMB_RUN_LLM_INTEGRATION: "1"
+      WMB_LLM_LIMIT: ${{ inputs.llm_limit }}
+      WMB_RUN_LONGMEMEVAL_LLM: ${{ inputs.run_longmemeval_llm && '1' || '0' }}
+      LLM_MODEL: ${{ inputs.llm_model || vars.LLM_MODEL }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Validate workflow inputs
+        run: |
+          if [ -z "${LLM_MODEL}" ]; then
+            echo "LLM_MODEL is required. Provide workflow input llm_model or set repository variable LLM_MODEL." >&2
+            exit 1
+          fi
+
+      - name: Sync dependencies
+        run: uv sync --group dev --extra llm --extra vector
+
+      - name: Run LLM smoke evaluation
+        run: bash scripts/reproduce_llm_smoke.sh
+
+      - name: Upload LLM smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-smoke-artifacts
+          path: |
+            reports/llm-smoke-results.md
+            reports/.llm_smoke_results.jsonl
+            reports/llm-smoke-run-ids.txt
+            runs
+          if-no-files-found: warn

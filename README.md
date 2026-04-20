@@ -1,5 +1,9 @@
 # Wiki-Memory-Bench
 
+[![CI](https://github.com/userljz/wiki-memory-bench/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/userljz/wiki-memory-bench/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+
 Benchmark Markdown/Wiki memory systems for LLM agents.
 
 > v0.1-alpha. Honest, serious, engineering-focused evaluation for teams building agent memory systems.
@@ -74,9 +78,13 @@ uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge ll
 uv run wmb report runs/latest --show-prompts
 ```
 
+Manual LLM calibration is documented in [`docs/llm-evaluation.md`](docs/llm-evaluation.md). The optional public LLM smoke report is still pending until a credentialed run is executed.
+
 ## v0.1-alpha Results
 
 The current reproducible alpha report is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md). It includes commit hash, environment, exact commands, run IDs, oracle labels, dependency modes, and failure analysis.
+
+For a broader public-dataset alpha slice that separates non-oracle rows from oracle upper bounds, see [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md).
 
 This table is intentionally conservative:
 
@@ -90,9 +98,10 @@ This table is intentionally conservative:
 | `synthetic-wiki-memory` | `bm25` | 50 | 70.00% | 50.00% | Deterministic diagnostic row, not a paper-quality leaderboard result. |
 | `synthetic-wiki-memory` | `clipwiki` | 50 | 70.00% | 60.00% | Evidence-first deterministic alpha row. |
 | `locomo-mc10` | `bm25` | 50 | 28.00% | 4.00% | Weak grounding on this alpha slice. |
+| `locomo-mc10` | `vector-rag` | 50 | 22.00% | 6.00% | Optional vector baseline; this row depends on local model downloads. |
 | `locomo-mc10` | `clipwiki` | 50 | 30.00% | 4.00% | Non-oracle `full-wiki` row; still weak on grounding. |
 
-`vector-rag` is supported, but in the current reproducibility environment the alpha report marks it `skipped` because the optional `vector` extra was not installed. That is why this README does not make any claim that `clipwiki` beats `vector-rag`.
+In this alpha run, `clipwiki` has higher answer accuracy than `vector-rag` on the `locomo-mc10` slice, while `vector-rag` has higher citation precision. That is still not enough evidence to claim that one system is generally better overall.
 
 ## Supported Datasets
 

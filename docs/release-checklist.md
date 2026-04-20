@@ -15,10 +15,11 @@ Suggested GitHub topics:
 - `agents`
 - `memory`
 - `benchmark`
+- `evals`
 - `rag`
 - `markdown`
 - `wiki`
-- `evaluation`
+- `long-term-memory`
 - `mcp`
 
 ## Release Notes

@@ -1,5 +1,9 @@
 # Wiki-Memory-Bench
 
+[![CI](https://github.com/userljz/wiki-memory-bench/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/userljz/wiki-memory-bench/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+
 Benchmark Markdown/Wiki memory systems for LLM agents.
 
 > v0.1-alpha。一个面向工程实践的、可复现且尽量诚实的 LLM Agent 记忆系统评测框架。
@@ -74,9 +78,13 @@ uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge ll
 uv run wmb report runs/latest --show-prompts
 ```
 
+可选的 LLM calibration 路径见 [`docs/llm-evaluation.md`](docs/llm-evaluation.md)。公共 LLM smoke 报告目前仍是 pending，只有在提供凭据后手动运行才会生成。
+
 ## v0.1-alpha 结果快照
 
 当前可复现的 alpha 报告在 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。其中包含 commit hash、环境信息、精确命令、run ID、oracle 标签、依赖模式和 failure analysis。
+
+如果你想看更偏公共数据集的 alpha slice，并且把 non-oracle 行和 oracle upper bound 分开看，请参考 [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)。
 
 下面这张表刻意保持保守：
 
@@ -90,9 +98,10 @@ uv run wmb report runs/latest --show-prompts
 | `synthetic-wiki-memory` | `bm25` | 50 | 70.00% | 50.00% | 确定性诊断行，不是论文级 leaderboard 结果。 |
 | `synthetic-wiki-memory` | `clipwiki` | 50 | 70.00% | 60.00% | evidence-first 的确定性 alpha 行。 |
 | `locomo-mc10` | `bm25` | 50 | 28.00% | 4.00% | 这一 alpha slice 上 grounding 很弱。 |
+| `locomo-mc10` | `vector-rag` | 50 | 22.00% | 6.00% | 可选向量基线；这行依赖本地模型下载环境。 |
 | `locomo-mc10` | `clipwiki` | 50 | 30.00% | 4.00% | 非 oracle 的 `full-wiki` 行；grounding 依然偏弱。 |
 
-`vector-rag` 是支持的，但在当前可复现环境中，alpha 报告把它标记为 `skipped`，因为没有安装可选 `vector` extra。正因如此，这份 README 不会声称 `clipwiki` 已经优于 `vector-rag`。
+在这次 alpha 运行里，`clipwiki` 在 `locomo-mc10` 这条 slice 上的 answer accuracy 高于 `vector-rag`，但 `vector-rag` 的 citation precision 更高。这个证据仍然不足以支持“某个系统总体上更好”的结论。
 
 ## 已支持的数据集
 
