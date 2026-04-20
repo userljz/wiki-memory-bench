@@ -78,4 +78,4 @@ Passed. Rendered Run Overview for synthetic-mini / bm25.
 
 ## GitHub Actions Run URL After Push
 
-Pending push.
+- CI fix verification run: `https://github.com/userljz/wiki-memory-bench/actions/runs/24667197445`
