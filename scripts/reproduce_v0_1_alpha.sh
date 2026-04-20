@@ -12,14 +12,11 @@ REPORT_FILE="$REPORT_DIR/v0.1-alpha-results.md"
 SMOKE_ONLY="${WMB_SMOKE_ONLY:-0}"
 SYNTHETIC_CASES="${WMB_SYNTHETIC_CASES:-100}"
 SYNTHETIC_OUT="${WMB_SYNTHETIC_OUT:-data/synthetic/wiki_memory_100.jsonl}"
+ALLOW_DIRTY_REPORT="${WMB_ALLOW_DIRTY_REPORT:-0}"
 
 if [[ "$SMOKE_ONLY" == "1" && -z "${WMB_SYNTHETIC_CASES:-}" ]]; then
   SYNTHETIC_CASES="20"
 fi
-
-mkdir -p "$REPORT_DIR"
-: > "$RESULTS_JSONL"
-: > "$RUN_IDS_FILE"
 
 TIMESTAMP_UTC="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 OS_SUMMARY="$(uname -a)"
@@ -35,6 +32,15 @@ fi
 if [[ -z "$GIT_STATUS_SUMMARY" ]]; then
   GIT_STATUS_SUMMARY="clean"
 fi
+
+if [[ "$GIT_STATUS_SUMMARY" != "clean" && "$ALLOW_DIRTY_REPORT" != "1" ]]; then
+  echo "Refusing to generate public report from dirty working tree." >&2
+  exit 1
+fi
+
+mkdir -p "$REPORT_DIR"
+: > "$RESULTS_JSONL"
+: > "$RUN_IDS_FILE"
 
 if command -v uv >/dev/null 2>&1; then
   UV_VERSION="$(uv --version)"
@@ -386,6 +392,7 @@ VECTOR_DEPENDENCY_INSTALLED="$VECTOR_DEPENDENCY_INSTALLED" \
 SYNTHETIC_CASES="$SYNTHETIC_CASES" \
 SYNTHETIC_OUT="$SYNTHETIC_OUT" \
 SMOKE_ONLY="$SMOKE_ONLY" \
+WMB_ALLOW_DIRTY_REPORT="$ALLOW_DIRTY_REPORT" \
 uv run python - <<'PY'
 import json
 import os
@@ -410,6 +417,7 @@ vector_dependency_installed = os.environ["VECTOR_DEPENDENCY_INSTALLED"]
 synthetic_cases = os.environ["SYNTHETIC_CASES"]
 synthetic_out = os.environ["SYNTHETIC_OUT"]
 smoke_only = os.environ["SMOKE_ONLY"] == "1"
+allow_dirty_report = os.environ["WMB_ALLOW_DIRTY_REPORT"] == "1"
 
 
 def fmt_metric(value, pct: bool = False) -> str:
@@ -459,7 +467,7 @@ def failure_analysis(records: list[dict[str, object]]) -> list[str]:
                 f"citation precision is {fmt_metric(citation_precision, pct=True)}."
             )
 
-    if git_status_summary != "clean":
+    if git_status_summary != "clean" and allow_dirty_report:
         findings.append(
             "- The working tree was dirty when this report was produced. Reproducing the exact numbers requires the same commit plus the local diff shown below."
         )
@@ -483,16 +491,18 @@ lines.extend(
         f"- Python: `{python_version}`",
         f"- uv: `{uv_version}`",
         f"- OS: `{os_summary}`",
+        f"- Git Status Summary: {'clean' if git_status_summary == 'clean' else 'dirty'}",
         f"- vector dependency installed: `{vector_dependency_installed}`",
     ]
 )
 lines.append("")
-lines.append("### Git Status Summary")
-lines.append("")
-lines.append("```text")
-lines.extend(git_status_summary.splitlines())
-lines.append("```")
-lines.append("")
+if git_status_summary != "clean":
+    lines.append("### Git Status Details")
+    lines.append("")
+    lines.append("```text")
+    lines.extend(git_status_summary.splitlines())
+    lines.append("```")
+    lines.append("")
 lines.append("## Commands Run")
 lines.append("")
 for command in commands:
