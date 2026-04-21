@@ -82,26 +82,32 @@ uv run wmb report runs/latest --show-prompts
 
 ## v0.1-alpha 结果快照
 
-当前可复现的 alpha 报告在 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。其中包含 commit hash、环境信息、精确命令、run ID、oracle 标签、依赖模式和 failure analysis。
+当前可复现的 alpha 报告在 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。其中包含 `evaluated_source_commit`、评测源码树是否干净、`report_commit` 说明、精确命令、vector-rag 状态、gold-label 使用情况、run ID、依赖模式和 failure analysis。
 
 如果你想看更偏公共数据集的 alpha slice，并且把 non-oracle 行和 oracle upper bound 分开看，请参考 [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)。
 
-下面这张表刻意保持保守：
+下面这张表是 alpha 报告里 `Result Table` 的压缩摘要，刻意保持保守：
 
 - 它混合了 smoke 行和 limited-slice alpha 行
 - 它不是最终的 scientific leaderboard
 - 它**不能**证明 `clipwiki` 在总体上优于 `vector-rag`
+- 如果生成后的报告再被提交，`report_commit` 可能会晚于 `evaluated_source_commit`
 
-| 数据集 | 系统 | Limit | Accuracy | Citation Precision | 限制 / 说明 |
-| --- | --- | ---: | ---: | ---: | --- |
-| `synthetic-mini` | `bm25` | 5 | 100.00% | 80.00% | 仅用于快速 smoke 验证。 |
-| `synthetic-wiki-memory` | `bm25` | 50 | 70.00% | 50.00% | 确定性诊断行，不是论文级 leaderboard 结果。 |
-| `synthetic-wiki-memory` | `clipwiki` | 50 | 70.00% | 60.00% | evidence-first 的确定性 alpha 行。 |
-| `locomo-mc10` | `bm25` | 50 | 28.00% | 4.00% | 这一 alpha slice 上 grounding 很弱。 |
-| `locomo-mc10` | `vector-rag` | 50 | 22.00% | 6.00% | 可选向量基线；这行依赖本地模型下载环境。 |
-| `locomo-mc10` | `clipwiki` | 50 | 30.00% | 4.00% | 非 oracle 的 `full-wiki` 行；grounding 依然偏弱。 |
+| 数据集 | 系统 | Mode | Status | Uses Gold Labels | Dependency Mode | Accuracy | Citation Precision |
+| --- | --- | --- | --- | --- | --- | ---: | ---: |
+| `synthetic-mini` | `bm25` | `default` | `ok` | `no` | `core` | 100.00% | 80.00% |
+| `synthetic-wiki-memory` | `bm25` | `default` | `ok` | `no` | `core` | 70.00% | 50.00% |
+| `synthetic-wiki-memory` | `clipwiki` | `full-wiki` | `ok` | `no` | `core` | 70.00% | 60.00% |
+| `locomo-mc10` | `bm25` | `default` | `ok` | `no` | `core` | 28.00% | 4.00% |
+| `locomo-mc10` | `vector-rag` | `default` | `ok` | `no` | `vector-extra-installed` | 22.00% | 6.00% |
+| `locomo-mc10` | `clipwiki` | `full-wiki` | `ok` | `no` | `core` | 30.00% | 4.00% |
 
-在这次 alpha 运行里，`clipwiki` 在 `locomo-mc10` 这条 slice 上的 answer accuracy 高于 `vector-rag`，但 `vector-rag` 的 citation precision 更高。这个证据仍然不足以支持“某个系统总体上更好”的结论。
+当前 alpha 报告状态摘要：
+
+- `vector-rag`：`ran`（`status=ok`，`dependency_mode=vector-extra-installed`）
+- 使用 gold labels 的行：`none`
+
+在当前 alpha 报告里，`locomo-mc10` 这几行都只是 citation precision 偏低的弱 alpha slice。它们应该被理解为某个时间点的工程快照，而不是“某个系统总体胜出”的证据。
 
 ## 已支持的数据集
 

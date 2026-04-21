@@ -82,26 +82,32 @@ Manual LLM calibration is documented in [`docs/llm-evaluation.md`](docs/llm-eval
 
 ## v0.1-alpha Results
 
-The current reproducible alpha report is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md). It includes commit hash, environment, exact commands, run IDs, oracle labels, dependency modes, and failure analysis.
+The current reproducible alpha report is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md). It records `evaluated_source_commit`, whether the evaluated source tree was clean, a `report_commit` note, exact commands, vector-rag status, gold-label usage, run IDs, dependency modes, and failure analysis.
 
 For a broader public-dataset alpha slice that separates non-oracle rows from oracle upper bounds, see [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md).
 
-This table is intentionally conservative:
+The table below is a condensed copy of the alpha report's `Result Table`. It is intentionally conservative:
 
 - it mixes smoke rows and limited-slice alpha rows
 - it is not a final scientific leaderboard
 - it does **not** prove that `clipwiki` is generally better than `vector-rag`
+- when a generated report is later committed, `report_commit` can be newer than `evaluated_source_commit`
 
-| Dataset | System | Limit | Accuracy | Citation Precision | Limitation / Note |
-| --- | --- | ---: | ---: | ---: | --- |
-| `synthetic-mini` | `bm25` | 5 | 100.00% | 80.00% | Built-in smoke benchmark only. |
-| `synthetic-wiki-memory` | `bm25` | 50 | 70.00% | 50.00% | Deterministic diagnostic row, not a paper-quality leaderboard result. |
-| `synthetic-wiki-memory` | `clipwiki` | 50 | 70.00% | 60.00% | Evidence-first deterministic alpha row. |
-| `locomo-mc10` | `bm25` | 50 | 28.00% | 4.00% | Weak grounding on this alpha slice. |
-| `locomo-mc10` | `vector-rag` | 50 | 22.00% | 6.00% | Optional vector baseline; this row depends on local model downloads. |
-| `locomo-mc10` | `clipwiki` | 50 | 30.00% | 4.00% | Non-oracle `full-wiki` row; still weak on grounding. |
+| Dataset | System | Mode | Status | Uses Gold Labels | Dependency Mode | Accuracy | Citation Precision |
+| --- | --- | --- | --- | --- | --- | ---: | ---: |
+| `synthetic-mini` | `bm25` | `default` | `ok` | `no` | `core` | 100.00% | 80.00% |
+| `synthetic-wiki-memory` | `bm25` | `default` | `ok` | `no` | `core` | 70.00% | 50.00% |
+| `synthetic-wiki-memory` | `clipwiki` | `full-wiki` | `ok` | `no` | `core` | 70.00% | 60.00% |
+| `locomo-mc10` | `bm25` | `default` | `ok` | `no` | `core` | 28.00% | 4.00% |
+| `locomo-mc10` | `vector-rag` | `default` | `ok` | `no` | `vector-extra-installed` | 22.00% | 6.00% |
+| `locomo-mc10` | `clipwiki` | `full-wiki` | `ok` | `no` | `core` | 30.00% | 4.00% |
 
-In this alpha run, `clipwiki` has higher answer accuracy than `vector-rag` on the `locomo-mc10` slice, while `vector-rag` has higher citation precision. That is still not enough evidence to claim that one system is generally better overall.
+Current alpha report status summary:
+
+- `vector-rag`: `ran` (`status=ok`, `dependency_mode=vector-extra-installed`)
+- rows using gold labels: `none`
+
+In the current alpha report, the `locomo-mc10` rows are all weak alpha slices with low citation precision. Read them as a point-in-time engineering snapshot, not as evidence that one system generally beats another.
 
 ## Supported Datasets
 

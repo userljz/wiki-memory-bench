@@ -73,6 +73,11 @@ def test_reproduce_script_smoke_executes(tmp_path: Path) -> None:
     report_text = report_path.read_text(encoding="utf-8")
     assert "synthetic-mini" in report_text
     assert "bm25" in report_text
+    assert "evaluated_source_commit:" in report_text
+    assert "report_commit:" in report_text
+    assert "source_tree_status: `clean`" in report_text
+    assert "vector_rag_status:" in report_text
+    assert "any_rows_use_gold_labels:" in report_text
 
 
 def test_reproduce_script_fails_on_dirty_tree_unless_override_set(tmp_path: Path) -> None:
@@ -117,15 +122,17 @@ def test_reproduce_script_fails_on_dirty_tree_unless_override_set(tmp_path: Path
 
     assert pass_result.returncode == 0, pass_result.stderr or pass_result.stdout
     report_text = (tmp_path / "dirty-reports-override" / "v0.1-alpha-results.md").read_text(encoding="utf-8")
-    assert "Git Status Summary: dirty" in report_text
+    assert "source_tree_status: `dirty`" in report_text
+    assert "source_tree_clean: `no`" in report_text
     assert "requires the same commit plus the local diff shown below" in report_text
 
 
 def test_alpha_report_includes_commit_hash_and_exact_commands() -> None:
     report_text = Path("reports/v0.1-alpha-results.md").read_text(encoding="utf-8")
 
-    assert "git commit:" in report_text
-    assert "Git Status Summary: clean" in report_text
+    assert "evaluated_source_commit:" in report_text
+    assert "report_commit:" in report_text
+    assert "source_tree_status: `clean`" in report_text
     assert "## Exact Commands" in report_text
     assert "uv run wmb run --dataset synthetic-mini --system bm25 --limit 5" in report_text
 
@@ -160,7 +167,8 @@ def test_smoke_generated_alpha_report_commit_hash_matches_current_head(tmp_path:
 
     assert result.returncode == 0, result.stderr or result.stdout
     report_text = (report_dir / "v0.1-alpha-results.md").read_text(encoding="utf-8")
-    assert head_sha in report_text
+    assert f"evaluated_source_commit: `{head_sha}`" in report_text
+    assert "source_tree_status: `clean`" in report_text
 
 
 def test_alpha_report_marks_oracle_systems_and_keeps_weak_rows_visible() -> None:
@@ -168,6 +176,9 @@ def test_alpha_report_marks_oracle_systems_and_keeps_weak_rows_visible() -> None
 
     assert "full-context-oracle" in report_text
     assert "## Oracle / Non-Oracle Explanation" in report_text
+    assert "vector_rag_status:" in report_text
+    assert "any_rows_use_gold_labels: `no`" in report_text
+    assert "rows_using_gold_labels: none" in report_text
     assert "| locomo-mc10 | bm25 |" in report_text
     assert "| locomo-mc10 | clipwiki |" in report_text
     assert "Poor-performing rows are intentionally retained." in report_text
