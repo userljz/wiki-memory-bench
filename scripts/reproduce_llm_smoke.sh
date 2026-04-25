@@ -332,6 +332,13 @@ run_case \
   "LLM answerer over lexical retrieval on LoCoMo-MC10." \
   "Unauthenticated Hugging Face access may reduce reliability or speed when datasets are not cached."
 
+run_case \
+  "locomo-mc10" \
+  "clipwiki" \
+  "LLM answerer over deterministic full-wiki retrieval on LoCoMo-MC10." \
+  "Wiki compilation quality and prompt following both affect this row." \
+  "--mode" "full-wiki"
+
 if [[ "$VECTOR_DEPENDENCY_INSTALLED" == "true" ]]; then
   run_case \
     "locomo-mc10" \
@@ -345,13 +352,6 @@ else
     "Skipped because vector dependencies are not installed." \
     "Install the optional vector stack to evaluate vector-rag in LLM smoke mode."
 fi
-
-run_case \
-  "locomo-mc10" \
-  "clipwiki" \
-  "LLM answerer over deterministic full-wiki retrieval on LoCoMo-MC10." \
-  "Wiki compilation quality and prompt following both affect this row." \
-  "--mode" "full-wiki"
 
 if [[ "$RUN_LONGMEMEVAL_LLM" == "1" ]]; then
   run_case \

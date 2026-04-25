@@ -30,7 +30,7 @@ Minimum manual setup:
 ```bash
 uv sync --group dev --extra llm --extra vector
 export WMB_RUN_LLM_INTEGRATION=1
-export LLM_MODEL="openai/gpt-4o-mini"
+export LLM_MODEL="openrouter/tencent/hy3-preview:free"
 export LLM_API_KEY="your-api-key"
 bash scripts/reproduce_llm_smoke.sh
 ```
@@ -42,6 +42,39 @@ export WMB_LLM_LIMIT=20
 export WMB_RUN_LONGMEMEVAL_LLM=1
 export LLM_BASE_URL="http://localhost:8000/v1"
 ```
+
+## OpenRouter with LiteLLM
+
+The benchmark's LLM answerers and LLM judge use LiteLLM, not the OpenRouter
+REST API directly. For OpenRouter through LiteLLM, keep the `openrouter/`
+provider prefix in `LLM_MODEL`:
+
+```bash
+uv sync --group dev --extra llm
+export LLM_MODEL="openrouter/tencent/hy3-preview:free"
+export LLM_API_KEY="your-openrouter-api-key"
+uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge deterministic --limit 2
+```
+
+OpenRouter-specific environment variables are accepted as fallbacks when the
+generic variables are not set:
+
+```bash
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+export OPENROUTER_API_BASE="https://openrouter.ai/api/v1"
+export OR_SITE_URL="https://github.com/wiki-memory-bench"
+export OR_APP_NAME="wiki-memory-bench"
+```
+
+`OPENROUTER_API_BASE`, `OR_SITE_URL`, and `OR_APP_NAME` are optional for
+normal OpenRouter use. LiteLLM defaults OpenRouter to the hosted API when no
+base URL is supplied.
+
+The optional `tests/test_openrouter.py` live probe calls OpenRouter's REST API
+directly and accepts either `LLM_API_KEY` or `OPENROUTER_API_KEY`. It strips
+the `openrouter/` prefix before sending the model name. The benchmark runtime
+does not strip that prefix because LiteLLM uses it to select the OpenRouter
+provider.
 
 If your endpoint truly does not require an API key, you must opt in explicitly:
 
@@ -101,6 +134,7 @@ Even then:
 - provider-side retries can increase real request count
 - token prices differ across providers
 - cached responses can make repeated runs look cheaper than a cold run
+- `--judge llm` makes additional LLM calls; use `--judge deterministic` for the cheapest calibration path
 
 Treat the generated estimated cost as an engineering estimate, not a billing statement.
 
@@ -113,6 +147,7 @@ Implications:
 - repeated runs with identical prompts may reuse cached responses
 - prompt artifacts are saved under each run's `artifacts/llm/answerer/`
 - the generated LLM smoke report includes prompt artifact paths, token usage, and estimated cost
+- prompt artifacts and cache files include prompts and raw model responses, but not API keys
 
 If you want a cold run:
 

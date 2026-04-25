@@ -69,16 +69,41 @@ uv run wmb report runs/latest
 
 ```bash
 uv sync --extra llm
-export LLM_MODEL="openai/gpt-4o-mini"
-export LLM_API_KEY="your-api-key"
-# 可选：OpenRouter 或本地 OpenAI-compatible endpoint
+export LLM_MODEL="openrouter/tencent/hy3-preview:free"
+export LLM_API_KEY="your-openrouter-api-key"
+# 可选：本地 OpenAI-compatible endpoint
 export LLM_BASE_URL="http://localhost:8000/v1"
 
-uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge llm --limit 20
+uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge deterministic --limit 2
 uv run wmb report runs/latest --show-prompts
 ```
 
-可选的 LLM calibration 路径见 [`docs/llm-evaluation.md`](docs/llm-evaluation.md)。公共 LLM smoke 报告目前仍是 pending，只有在提供凭据后手动运行才会生成。
+通过 LiteLLM 使用 OpenRouter 时，`LLM_MODEL` 里保留 `openrouter/` 前缀。
+如果没有设置 `LLM_API_KEY` 或 `LLM_BASE_URL`，也可以分别用
+`OPENROUTER_API_KEY` 和 `OPENROUTER_API_BASE` 作为回退配置。低成本校准建议先用
+`--judge deterministic`；`--judge llm` 会额外调用模型。
+
+### 可选 LLM smoke
+
+可选 LLM smoke 是手动校准流程，和下面的 deterministic alpha 结果分开解释。
+它不会在普通 `push` 或 `pull_request` CI 中运行，并且脚本会拒绝在缺少
+`WMB_RUN_LLM_INTEGRATION=1`、`LLM_MODEL`、`LLM_API_KEY` 的情况下执行。
+
+```bash
+uv sync --group dev --extra llm --extra vector
+export WMB_RUN_LLM_INTEGRATION=1
+export WMB_LLM_LIMIT=20
+export LLM_MODEL="openrouter/tencent/hy3-preview:free"
+export LLM_API_KEY="your-openrouter-api-key"
+bash scripts/reproduce_llm_smoke.sh
+```
+
+生成的校准报告在 [`reports/llm-smoke-results.md`](reports/llm-smoke-results.md)，
+旁路数据文件为 `reports/.llm_smoke_results.jsonl` 和
+`reports/llm-smoke-run-ids.txt`。这些行受模型和 provider 行为影响，不应和
+deterministic alpha rows 混成同一个 leaderboard。
+
+可选的 LLM calibration 路径见 [`docs/llm-evaluation.md`](docs/llm-evaluation.md)。
 
 ## v0.1-alpha 结果快照
 

@@ -39,6 +39,7 @@ First public alpha release.
 - Added `workflow_dispatch` support for optional LLM smoke evaluation:
   - `.github/workflows/llm-smoke.yml`
 - Added documentation for optional LLM evaluation in `docs/llm-evaluation.md`
+- Added `reports/llm-smoke-results.md` as an optional, credentialed calibration report separate from deterministic alpha rows
 
 ### Caveats
 

@@ -103,6 +103,35 @@ def test_litellm_runtime_caches_by_prompt_hash(tmp_path: Path, monkeypatch) -> N
     assert list((tmp_path / "artifacts").glob("*.json"))
 
 
+def test_litellm_runtime_uses_openrouter_env_fallbacks(tmp_path: Path, monkeypatch) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    def capture_completion(**kwargs):  # type: ignore[no-untyped-def]
+        captured_kwargs.update(kwargs)
+        return _fake_completion(**kwargs)
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.setenv("LLM_MODEL", "openrouter/tencent/hy3-preview:free")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
+    monkeypatch.setattr("wiki_memory_bench.utils.llm.completion", capture_completion)
+    monkeypatch.setattr("wiki_memory_bench.utils.llm.completion_cost", _fake_completion_cost)
+
+    runtime = LiteLLMRuntime(
+        task_name="answerer",
+        cache_dir=tmp_path / "cache",
+        artifact_dir=tmp_path / "artifacts",
+    )
+    parsed, _, metadata = runtime.complete_json("test prompt")
+
+    assert parsed["choice_text"] == "Aurora"
+    assert metadata["cached"] is False
+    assert captured_kwargs["model"] == "openrouter/tencent/hy3-preview:free"
+    assert captured_kwargs["api_key"] == "openrouter-key"
+    assert captured_kwargs["base_url"] == "https://openrouter.ai/api/v1"
+
+
 def test_litellm_runtime_reports_missing_optional_dependency(tmp_path: Path, monkeypatch) -> None:
     _block_litellm_import(monkeypatch)
     runtime = LiteLLMRuntime(

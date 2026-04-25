@@ -69,16 +69,41 @@ Install the optional LLM stack only if you want LLM answerers or LLM judges.
 
 ```bash
 uv sync --extra llm
-export LLM_MODEL="openai/gpt-4o-mini"
-export LLM_API_KEY="your-api-key"
-# Optional for OpenRouter or local OpenAI-compatible endpoints
+export LLM_MODEL="openrouter/tencent/hy3-preview:free"
+export LLM_API_KEY="your-openrouter-api-key"
+# Optional for local OpenAI-compatible endpoints
 export LLM_BASE_URL="http://localhost:8000/v1"
 
-uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge llm --limit 20
+uv run wmb run --dataset locomo-mc10 --system clipwiki --answerer llm --judge deterministic --limit 2
 uv run wmb report runs/latest --show-prompts
 ```
 
-Manual LLM calibration is documented in [`docs/llm-evaluation.md`](docs/llm-evaluation.md). The optional public LLM smoke report is still pending until a credentialed run is executed.
+For OpenRouter through LiteLLM, keep the `openrouter/` prefix in `LLM_MODEL`.
+`OPENROUTER_API_KEY` and `OPENROUTER_API_BASE` are also accepted as fallbacks
+when `LLM_API_KEY` or `LLM_BASE_URL` are not set. Use `--judge deterministic`
+for low-cost calibration; `--judge llm` makes additional model calls.
+
+### Optional LLM smoke
+
+The optional LLM smoke path is a manual calibration workflow, separate from the
+deterministic alpha results below. It is not part of normal `push` or
+`pull_request` CI, and it refuses to run unless `WMB_RUN_LLM_INTEGRATION=1`,
+`LLM_MODEL`, and `LLM_API_KEY` are configured.
+
+```bash
+uv sync --group dev --extra llm --extra vector
+export WMB_RUN_LLM_INTEGRATION=1
+export WMB_LLM_LIMIT=20
+export LLM_MODEL="openrouter/tencent/hy3-preview:free"
+export LLM_API_KEY="your-openrouter-api-key"
+bash scripts/reproduce_llm_smoke.sh
+```
+
+The generated calibration report is written to
+[`reports/llm-smoke-results.md`](reports/llm-smoke-results.md), with sidecars
+at `reports/.llm_smoke_results.jsonl` and `reports/llm-smoke-run-ids.txt`.
+
+Manual LLM calibration is documented in [`docs/llm-evaluation.md`](docs/llm-evaluation.md). Keep these rows separate from deterministic alpha results: they are optional calibration runs with provider-dependent behavior.
 
 ## v0.1-alpha Results
 

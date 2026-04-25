@@ -13,6 +13,8 @@ from typing import Any
 from wiki_memory_bench.schemas import TokenUsage
 from wiki_memory_bench.utils.paths import ensure_runtime_dirs, llm_cache_dir
 
+OPENROUTER_MODEL_PREFIX = "openrouter/"
+
 
 class MissingLLMDependencyError(RuntimeError):
     """Raised when optional llm dependencies are not installed."""
@@ -45,6 +47,26 @@ def completion_cost(*args: Any, **kwargs: Any) -> Any:
     return litellm_module.completion_cost(*args, **kwargs)
 
 
+def _is_openrouter_model(model: str | None) -> bool:
+    return bool(model and model.startswith(OPENROUTER_MODEL_PREFIX))
+
+
+def _resolve_api_key(model: str | None, api_key: str | None) -> str | None:
+    if api_key is not None:
+        return api_key
+    if _is_openrouter_model(model):
+        return os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+    return os.getenv("LLM_API_KEY")
+
+
+def _resolve_base_url(model: str | None, base_url: str | None) -> str | None:
+    if base_url is not None:
+        return base_url
+    if _is_openrouter_model(model):
+        return os.getenv("LLM_BASE_URL") or os.getenv("OPENROUTER_API_BASE")
+    return os.getenv("LLM_BASE_URL")
+
+
 class LiteLLMRuntime:
     """Thin JSON-oriented LiteLLM wrapper for answerers and judges."""
 
@@ -62,8 +84,8 @@ class LiteLLMRuntime:
     ) -> None:
         self.task_name = task_name
         self.model = model or os.getenv("LLM_MODEL")
-        self.api_key = api_key if api_key is not None else os.getenv("LLM_API_KEY")
-        self.base_url = base_url if base_url is not None else os.getenv("LLM_BASE_URL")
+        self.api_key = _resolve_api_key(self.model, api_key)
+        self.base_url = _resolve_base_url(self.model, base_url)
         self.cache_dir = cache_dir or llm_cache_dir()
         self.artifact_dir = artifact_dir
         self.max_retries = max_retries
