@@ -14,15 +14,15 @@ from wiki_memory_bench.utils.paths import resolve_user_path, synthetic_data_dir
 
 TASK_TYPES = [
     "direct_recall",
-    "knowledge_update",
-    "stale_claim_detection",
-    "temporal_reasoning",
-    "contradiction_resolution",
-    "selective_forgetting",
+    "update_latest_fact",
+    "stale_claim_avoidance",
+    "explicit_forgetting",
+    "conflicting_sources",
+    "multi_source_aggregation",
+    "temporal_question",
     "citation_required",
-    "preference_following",
-    "multi_session_aggregation",
-    "abstention",
+    "abstention_when_not_in_memory",
+    "paraphrased_question",
 ]
 
 PEOPLE = ["Avery", "Morgan", "Jordan", "Taylor", "Riley", "Casey", "Quinn", "Skyler", "Parker", "Jamie"]
@@ -97,6 +97,10 @@ def convert_synthetic_case(record: dict[str, Any], dataset_name: str = "syntheti
                 )
             )
 
+    question_type = str(record.get("question_type", record["task_type"]))
+    memory_operations = list(record.get("memory_operations", record.get("memory_operation_labels", [])))
+    generation_template_id = str(record.get("generation_template_id", f"legacy:{record['task_type']}"))
+
     return EvalCase(
         example_id=str(record["case_id"]),
         dataset_name=dataset_name,
@@ -104,7 +108,7 @@ def convert_synthetic_case(record: dict[str, Any], dataset_name: str = "syntheti
         question=str(record["question"]),
         answer=str(record["expected_answer"]),
         question_id=str(record["case_id"]),
-        question_type=str(record["task_type"]),
+        question_type=question_type,
         history_clips=history_clips,
         haystack_sessions=haystack_sessions,
         haystack_session_ids=haystack_session_ids,
@@ -113,13 +117,14 @@ def convert_synthetic_case(record: dict[str, Any], dataset_name: str = "syntheti
         gold_evidence=[str(value) for value in record.get("expected_source_ids", [])],
         metadata={
             "task_type": record["task_type"],
-            "question_type": record["task_type"],
+            "question_type": question_type,
             "case_type": record["task_type"],
+            "generation_template_id": generation_template_id,
             "curated_clips": list(record.get("curated_clips", [])),
             "expected_source_ids": list(record.get("expected_source_ids", [])),
             "stale_source_ids": list(record.get("stale_source_ids", [])),
             "source_ids": [str(session["session_id"]) for session in record["sessions"]],
-            "memory_operations": list(record.get("memory_operation_labels", [])),
+            "memory_operations": memory_operations,
         },
     )
 
@@ -213,7 +218,7 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             memory_operations=["add", "cite"],
         )
 
-    if task_type == "knowledge_update":
+    if task_type == "update_latest_fact":
         answer = city_b
         sessions = [
             _session(
@@ -236,14 +241,14 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             case_number=case_number,
             sessions=sessions,
             curated_clips=[sessions[1]["messages"][0]["message_id"]],
-            question=f"Where should the wiki say {person}'s office is now?",
+            question=f"What city should be treated as {person}'s current office location?",
             expected_answer=answer,
             expected_source_ids=[sessions[1]["session_id"]],
             stale_source_ids=[sessions[0]["session_id"]],
             memory_operations=["add", "update", "cite"],
         )
 
-    if task_type == "stale_claim_detection":
+    if task_type == "stale_claim_avoidance":
         sessions = [
             _session(
                 case_number,
@@ -265,43 +270,44 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             case_number=case_number,
             sessions=sessions,
             curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
-            question=f"Is the wiki claim '{project} launches in May 2026' still current?",
+            question=f"Should memory still present the old May 2026 launch plan for {project} as current?",
             expected_answer="No, the old claim is stale. The current launch month is June 2026.",
             expected_source_ids=[sessions[1]["session_id"]],
             stale_source_ids=[sessions[0]["session_id"]],
             memory_operations=["update", "deprecate", "cite"],
         )
 
-    if task_type == "temporal_reasoning":
-        review_date = (start + timedelta(days=9)).date().isoformat()
+    if task_type == "explicit_forgetting":
+        answer = "Not enough information in memory."
         sessions = [
             _session(
                 case_number,
                 1,
                 start,
-                [_message(case_number, 1, 1, person, f"The design review is on {review_date}.")],
-                f"Design review scheduled on {review_date}.",
+                [_message(case_number, 1, 1, person, f"Temporary access code: {case_number:04d}. Do not keep this beyond today.")],
+                "A temporary access code is mentioned and marked short-lived.",
             ),
             _session(
                 case_number,
                 2,
-                start + timedelta(days=2),
-                [_message(case_number, 2, 1, friend, f"The customer demo is two days after {review_date}.")],
-                f"Customer demo happens after {review_date}.",
+                start + timedelta(days=1),
+                [_message(case_number, 2, 1, friend, "Explicit memory operation: forget the temporary access code after use.")],
+                "The temporary access code should be forgotten.",
             ),
         ]
         return _case(
             task_type=task_type,
             case_number=case_number,
             sessions=sessions,
-            curated_clips=[sessions[0]["messages"][0]["message_id"]],
-            question="When is the design review scheduled?",
-            expected_answer=review_date,
-            expected_source_ids=[sessions[0]["session_id"]],
-            memory_operations=["add", "cite"],
+            curated_clips=[sessions[1]["messages"][0]["message_id"]],
+            question="What temporary access code should still be retrievable from long-term memory?",
+            expected_answer=answer,
+            expected_source_ids=[sessions[1]["session_id"]],
+            stale_source_ids=[sessions[0]["session_id"]],
+            memory_operations=["add", "forget", "deprecate", "cite"],
         )
 
-    if task_type == "contradiction_resolution":
+    if task_type == "conflicting_sources":
         answer = "4 spaces"
         sessions = [
             _session(
@@ -324,41 +330,69 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             case_number=case_number,
             sessions=sessions,
             curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
-            question="What indentation style should the wiki preserve as current policy?",
+            question="Which indentation rule should be considered authoritative now?",
             expected_answer=answer,
             expected_source_ids=[sessions[1]["session_id"]],
             stale_source_ids=[sessions[0]["session_id"]],
             memory_operations=["update", "deprecate", "cite"],
         )
 
-    if task_type == "selective_forgetting":
-        answer = "Not enough information in memory."
+    if task_type == "multi_source_aggregation":
+        answer = f"{project} and {hobby}"
         sessions = [
             _session(
                 case_number,
                 1,
                 start,
-                [_message(case_number, 1, 1, person, f"Temporary access code: {case_number:04d}. Do not keep this forever.")],
-                "A temporary code is mentioned.",
+                [_message(case_number, 1, 1, person, f"This month I started the {project} project.")],
+                f"{person} started the {project} project.",
             ),
             _session(
                 case_number,
                 2,
-                start + timedelta(days=1),
-                [_message(case_number, 2, 1, friend, "For safety, remove the temporary access code from long-term memory after use.")],
-                "The temporary code should be forgotten.",
+                start + timedelta(days=6),
+                [_message(case_number, 2, 1, person, f"I also picked up {hobby} on weekends.")],
+                f"{person} picked up {hobby} on weekends.",
             ),
         ]
         return _case(
             task_type=task_type,
             case_number=case_number,
             sessions=sessions,
-            curated_clips=[sessions[1]["messages"][0]["message_id"]],
-            question="What temporary access code should still be available in memory?",
+            curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
+            question=f"What two new things should memory combine for {person} this month?",
             expected_answer=answer,
-            expected_source_ids=[sessions[1]["session_id"]],
-            stale_source_ids=[sessions[0]["session_id"]],
-            memory_operations=["forget", "deprecate"],
+            expected_source_ids=[sessions[0]["session_id"], sessions[1]["session_id"]],
+            memory_operations=["add", "cite"],
+        )
+
+    if task_type == "temporal_question":
+        review_date = (start + timedelta(days=9)).date().isoformat()
+        sessions = [
+            _session(
+                case_number,
+                1,
+                start,
+                [_message(case_number, 1, 1, person, f"The design review is on {review_date}.")],
+                f"Design review scheduled on {review_date}.",
+            ),
+            _session(
+                case_number,
+                2,
+                start + timedelta(days=2),
+                [_message(case_number, 2, 1, friend, f"The customer demo is two days after {review_date}.")],
+                f"Customer demo happens after {review_date}.",
+            ),
+        ]
+        return _case(
+            task_type=task_type,
+            case_number=case_number,
+            sessions=sessions,
+            curated_clips=[sessions[0]["messages"][0]["message_id"]],
+            question="Which calendar day is reserved for the design review?",
+            expected_answer=review_date,
+            expected_source_ids=[sessions[0]["session_id"]],
+            memory_operations=["add", "cite"],
         )
 
     if task_type == "citation_required":
@@ -384,71 +418,13 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             case_number=case_number,
             sessions=sessions,
             curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
-            question="What is the title of the launch note, and which source should support it?",
+            question="What launch note title should be answered with source support?",
             expected_answer=answer,
             expected_source_ids=[sessions[0]["session_id"]],
             memory_operations=["add", "cite"],
         )
 
-    if task_type == "preference_following":
-        answer = food
-        sessions = [
-            _session(
-                case_number,
-                1,
-                start,
-                [_message(case_number, 1, 1, person, f"My favorite comfort food right now is {answer}.")],
-                f"{person}'s current favorite comfort food is {answer}.",
-            ),
-            _session(
-                case_number,
-                2,
-                start + timedelta(days=4),
-                [_message(case_number, 2, 1, friend, f"When planning lunch with {person}, pick {answer} if possible.")],
-                f"Lunch planning should follow {person}'s preference for {answer}.",
-            ),
-        ]
-        return _case(
-            task_type=task_type,
-            case_number=case_number,
-            sessions=sessions,
-            curated_clips=[sessions[0]["messages"][0]["message_id"]],
-            question=f"What food preference should the wiki follow for {person}?",
-            expected_answer=answer,
-            expected_source_ids=[sessions[0]["session_id"]],
-            memory_operations=["add", "cite"],
-        )
-
-    if task_type == "multi_session_aggregation":
-        answer = f"{project} and {hobby}"
-        sessions = [
-            _session(
-                case_number,
-                1,
-                start,
-                [_message(case_number, 1, 1, person, f"This month I started the {project} project.")],
-                f"{person} started the {project} project.",
-            ),
-            _session(
-                case_number,
-                2,
-                start + timedelta(days=6),
-                [_message(case_number, 2, 1, person, f"I also picked up {hobby} on weekends.")],
-                f"{person} picked up {hobby} on weekends.",
-            ),
-        ]
-        return _case(
-            task_type=task_type,
-            case_number=case_number,
-            sessions=sessions,
-            curated_clips=[sessions[0]["messages"][0]["message_id"], sessions[1]["messages"][0]["message_id"]],
-            question=f"What two new things should the wiki aggregate for {person} this month?",
-            expected_answer=answer,
-            expected_source_ids=[sessions[0]["session_id"], sessions[1]["session_id"]],
-            memory_operations=["add", "cite"],
-        )
-
-    if task_type == "abstention":
+    if task_type == "abstention_when_not_in_memory":
         sessions = [
             _session(
                 case_number,
@@ -473,7 +449,39 @@ def _build_case(task_type: str, case_number: int, rng: random.Random) -> dict[st
             question=f"What is {person}'s passport number?",
             expected_answer="Not enough information in memory.",
             expected_source_ids=[],
-            memory_operations=["cite"],
+            memory_operations=["add", "cite"],
+        )
+
+    if task_type == "paraphrased_question":
+        answer = tool_a
+        sessions = [
+            _session(
+                case_number,
+                1,
+                start,
+                [
+                    _message(case_number, 1, 1, person, f"My preferred database for analytics is {answer}."),
+                    _message(case_number, 1, 2, friend, f"Noted: {answer} is the analytics datastore to remember."),
+                ],
+                f"{person}'s analytics datastore preference is {answer}.",
+            ),
+            _session(
+                case_number,
+                2,
+                start + timedelta(days=2),
+                [_message(case_number, 2, 1, person, f"I may compare {tool_b} later, but that is not my default.")],
+                f"{person} may evaluate {tool_b}, but it is not the default.",
+            ),
+        ]
+        return _case(
+            task_type=task_type,
+            case_number=case_number,
+            sessions=sessions,
+            curated_clips=[sessions[0]["messages"][0]["message_id"]],
+            question=f"Which datastore should be treated as {person}'s analytics default, even though the question avoids quoting the original wording?",
+            expected_answer=answer,
+            expected_source_ids=[sessions[0]["session_id"]],
+            memory_operations=["add", "cite"],
         )
 
     raise ValueError(f"Unsupported synthetic task type: {task_type}")
@@ -494,12 +502,15 @@ def _case(
     record = {
         "case_id": f"synthetic-wiki-memory-{task_type}-{case_number:03d}",
         "task_type": task_type,
+        "question_type": task_type,
+        "generation_template_id": f"{task_type}:v2",
         "sessions": sessions,
         "curated_clips": curated_clips,
         "question": question,
         "expected_answer": expected_answer,
         "expected_source_ids": expected_source_ids,
         "stale_source_ids": stale_source_ids or [],
+        "memory_operations": memory_operations,
         "memory_operation_labels": memory_operations,
     }
     validate_synthetic_case(record)
@@ -519,10 +530,14 @@ def validate_synthetic_case(record: dict[str, Any]) -> None:
     expected_source_ids = set(str(value) for value in record.get("expected_source_ids", []))
     stale_source_ids = set(str(value) for value in record.get("stale_source_ids", []))
     curated_clips = [str(value) for value in record.get("curated_clips", [])]
-    memory_operations = set(str(value) for value in record.get("memory_operation_labels", []))
+    memory_operations = set(str(value) for value in record.get("memory_operations", record.get("memory_operation_labels", [])))
 
     if not record.get("task_type"):
         raise ValueError("task_type must not be empty")
+    if not record.get("question_type"):
+        raise ValueError("question_type must not be empty")
+    if not record.get("generation_template_id"):
+        raise ValueError("generation_template_id must not be empty")
     if not record.get("expected_answer"):
         raise ValueError("expected_answer must not be empty")
     if not expected_source_ids.issubset(session_ids):
@@ -533,7 +548,7 @@ def validate_synthetic_case(record: dict[str, Any]) -> None:
         raise ValueError("expected_source_ids and stale_source_ids must not overlap")
     if any(clip_id not in message_ids for clip_id in curated_clips):
         raise ValueError("all curated_clips must refer to existing messages")
-    if record["task_type"] != "abstention" and not curated_clips:
+    if record["task_type"] != "abstention_when_not_in_memory" and not curated_clips:
         raise ValueError("curated_clips should be non-empty for non-abstention tasks")
     if not memory_operations.issubset({"add", "update", "deprecate", "forget", "cite"}):
         raise ValueError("memory_operation_labels contains unsupported values")

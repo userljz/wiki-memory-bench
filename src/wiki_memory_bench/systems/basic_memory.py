@@ -97,7 +97,7 @@ def basic_memory_doctor_payload() -> dict[str, object]:
         "mode": status.mode,
         "backend_mode": "real_basic_memory" if status.available else "fallback_local_search",
         "install_command": "uv tool install basic-memory",
-        "docs": "docs/basic-memory-adapter.md",
+        "docs": "docs/internal/basic-memory-adapter.md",
         "limitations": status.limitations,
     }
 

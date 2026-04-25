@@ -60,6 +60,54 @@ def test_clipwiki_curated_mode_uses_curated_clips_metadata(tmp_path: Path) -> No
     assert set(compiled.selected_session_ids) == expected_sessions
 
 
+def test_clipwiki_curated_without_curated_clips_does_not_select_gold_session_by_label(tmp_path: Path) -> None:
+    example = get_dataset("synthetic-mini").load().examples[1].model_copy(deep=True)
+    example.metadata["curated_clips"] = []
+    example.gold_evidence = ["session-2"]
+    example.question = "Which database does Avery prefer for analytics?"
+    example.haystack_session_summaries = [
+        "Analytics preference: Avery uses PostgreSQL for dashboards.",
+        "Current office update: Avery moved to Seattle.",
+    ]
+
+    compiled = compile_clipwiki(example, tmp_path, mode="curated", curated_top_k=1)
+
+    assert compiled.selected_session_ids == ["session-1"]
+
+
+def test_clipwiki_oracle_curated_may_select_gold_session_and_marks_metadata(tmp_path: Path) -> None:
+    example = get_dataset("synthetic-mini").load().examples[1].model_copy(deep=True)
+    example.metadata["curated_clips"] = []
+    example.gold_evidence = ["session-2"]
+    compiled = compile_clipwiki(example, tmp_path / "compiled", mode="oracle-curated")
+
+    assert compiled.selected_session_ids == ["session-2"]
+
+    system = ClipWikiBaseline(mode="oracle-curated")
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    system.prepare_run(run_dir, "synthetic-mini")
+    prediction = system.run(example)
+
+    assert prediction.metadata["uses_gold_labels"] is True
+    assert prediction.metadata["oracle_mode"] is True
+    assert prediction.metadata["gold_label_fields_used"] == ["gold_evidence"]
+
+
+def test_clipwiki_full_wiki_marks_non_oracle_metadata(tmp_path: Path) -> None:
+    example = get_dataset("synthetic-mini").load().examples[1]
+    system = ClipWikiBaseline(mode="full-wiki")
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    system.prepare_run(run_dir, "synthetic-mini")
+
+    prediction = system.run(example)
+
+    assert prediction.metadata["uses_gold_labels"] is False
+    assert prediction.metadata["oracle_mode"] is False
+    assert prediction.metadata["gold_label_fields_used"] == []
+
+
 def test_concept_pages_do_not_include_raw_question(tmp_path: Path) -> None:
     case = generate_synthetic_wiki_memory_cases(cases=1, seed=42)[0]
     example = convert_synthetic_case(case)

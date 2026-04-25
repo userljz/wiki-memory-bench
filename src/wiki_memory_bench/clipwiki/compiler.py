@@ -45,6 +45,9 @@ PAGE_TYPE_BIASES = {
     "index": -1.25,
     "log": -1.5,
 }
+ORACLE_MODES = {"oracle-curated"}
+NON_ORACLE_MODES = {"full-wiki", "curated", "noisy-curated"}
+GOLD_LABEL_FIELDS = ("gold_evidence",)
 
 
 @dataclass(slots=True)
@@ -344,13 +347,14 @@ def select_session_indices(
         curated_from_clips = _curated_session_indices_from_metadata(example)
         if curated_from_clips:
             return curated_from_clips
-        return _gold_or_heuristic_session_indices(example, top_k=curated_top_k)
+        return _heuristic_session_indices(example, top_k=curated_top_k)
 
-    curated = _gold_or_heuristic_session_indices(example, top_k=curated_top_k)
     if mode == "oracle-curated":
-        return curated
+        gold_indices = _gold_session_indices(example, top_k=curated_top_k)
+        return gold_indices or _heuristic_session_indices(example, top_k=curated_top_k)
 
     if mode == "noisy-curated":
+        curated = _heuristic_session_indices(example, top_k=curated_top_k)
         remaining = [index for index in all_indices if index not in curated]
         rng = random.Random(example.question_id or example.example_id)
         noisy_count = min(noisy_extra_sessions, len(remaining))
@@ -517,7 +521,7 @@ def _dedupe_preserve_order(values: list[str]) -> list[str]:
     return deduped
 
 
-def _gold_or_heuristic_session_indices(example: PreparedExample, top_k: int) -> list[int]:
+def _gold_session_indices(example: PreparedExample, top_k: int) -> list[int]:
     if example.gold_evidence:
         selected = [
             index
@@ -526,7 +530,10 @@ def _gold_or_heuristic_session_indices(example: PreparedExample, top_k: int) -> 
         ]
         if selected:
             return selected[:top_k]
+    return []
 
+
+def _heuristic_session_indices(example: PreparedExample, top_k: int) -> list[int]:
     session_texts = []
     for index, session_id in enumerate(example.haystack_session_ids):
         summary = example.haystack_session_summaries[index] if index < len(example.haystack_session_summaries) else ""

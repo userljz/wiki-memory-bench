@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from time import perf_counter
 
-from wiki_memory_bench.clipwiki.compiler import compile_clipwiki, page_score_lookup, retrieve_wiki_pages
+from wiki_memory_bench.clipwiki.compiler import GOLD_LABEL_FIELDS, ORACLE_MODES, compile_clipwiki, page_score_lookup, retrieve_wiki_pages
 from wiki_memory_bench.schemas import Citation, PreparedExample, RetrievedItem, SystemResult, TaskType, TokenUsage
 from wiki_memory_bench.systems.answering import build_answerer, build_open_qa_answerer
 from wiki_memory_bench.systems.base import SystemAdapter, choice_index, register_system
@@ -79,9 +79,9 @@ class ClipWikiBaseline(SystemAdapter):
         ]
 
         page_map = {page.page_id: page for page in compiled_wiki.pages}
+        fairness_metadata = self._fairness_metadata()
 
         citations = []
-        latency_ms = (perf_counter() - started) * 1000.0
 
         if example.task_type == TaskType.MULTIPLE_CHOICE:
             selection = self.answerer.select_choice(example, answer_items or retrieved_items)
@@ -112,6 +112,7 @@ class ClipWikiBaseline(SystemAdapter):
                 [item.text for item in retrieved_items] + [example.question] + [choice.text for choice in example.choices]
             )
             output_tokens = estimate_text_tokens(selected_choice.text)
+            latency_ms = (perf_counter() - started) * 1000.0
             return SystemResult(
                 example_id=example.example_id,
                 system_name=self.name,
@@ -137,6 +138,7 @@ class ClipWikiBaseline(SystemAdapter):
                     "answerer_mode": self.answerer_mode,
                     "selected_session_ids": compiled_wiki.selected_session_ids,
                     "wiki_dir": str(example_wiki_dir),
+                    **fairness_metadata,
                     **selection.metadata,
                 },
             )
@@ -166,6 +168,7 @@ class ClipWikiBaseline(SystemAdapter):
 
         input_tokens = estimate_token_total([item.text for item in retrieved_items] + [example.question])
         output_tokens = estimate_text_tokens(selection.answer_text)
+        latency_ms = (perf_counter() - started) * 1000.0
         return SystemResult(
             example_id=example.example_id,
             system_name=self.name,
@@ -188,6 +191,16 @@ class ClipWikiBaseline(SystemAdapter):
                 "answerer_mode": self.answerer_mode,
                 "selected_session_ids": compiled_wiki.selected_session_ids,
                 "wiki_dir": str(example_wiki_dir),
+                **fairness_metadata,
                 **selection.metadata,
             },
         )
+
+    def _fairness_metadata(self) -> dict[str, object]:
+        oracle_mode = self.mode in ORACLE_MODES
+        return {
+            "oracle_label": "gold-evidence-selection" if oracle_mode else "non-oracle",
+            "uses_gold_labels": oracle_mode,
+            "oracle_mode": oracle_mode,
+            "gold_label_fields_used": list(GOLD_LABEL_FIELDS) if oracle_mode else [],
+        }

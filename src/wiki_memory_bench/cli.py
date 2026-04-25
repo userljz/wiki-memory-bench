@@ -24,6 +24,12 @@ app.add_typer(systems_app, name="systems")
 app.add_typer(synthetic_app, name="synthetic")
 
 
+def _top_k_option(system_name: str, top_k: int) -> dict[str, int]:
+    if system_name == "clipwiki":
+        return {"retrieval_top_k": top_k}
+    return {"top_k": top_k}
+
+
 @datasets_app.command("list")
 def list_datasets_command() -> None:
     """List registered datasets."""
@@ -45,11 +51,12 @@ def prepare_datasets_command(
     split: str | None = typer.Option(None, help="Optional dataset split, for example s, m, or oracle."),
     limit: int | None = typer.Option(None, min=1, help="Maximum number of examples to prepare."),
     sample: int | None = typer.Option(None, min=1, help="Random sample size for quick tests."),
+    seed: int = typer.Option(42, help="Seed used when sampling prepared examples."),
 ) -> None:
     """Prepare a dataset and persist normalized examples under data/prepared."""
 
     console = get_console()
-    dataset, output_dir = prepare_dataset(dataset_name, limit=limit, sample=sample, split=split)
+    dataset, output_dir = prepare_dataset(dataset_name, limit=limit, sample=sample, seed=seed, split=split)
 
     table = Table(title="Dataset Prepared")
     table.add_column("Field")
@@ -142,6 +149,14 @@ def run_command(
     judge: str = typer.Option("deterministic", help="Judge mode: deterministic or llm."),
     limit: int | None = typer.Option(None, min=1, help="Maximum number of examples to run."),
     sample: int | None = typer.Option(None, min=1, help="Random sample size for quick tests."),
+    seed: int = typer.Option(42, help="Seed used when sampling examples."),
+    top_k: int | None = typer.Option(None, min=1, help="Optional retrieval top-k for systems that support it."),
+    run_name: str | None = typer.Option(None, help="Optional human-readable run label recorded in manifest."),
+    continue_on_error: bool = typer.Option(
+        False,
+        "--continue-on-error/--fail-fast",
+        help="Continue a run after per-example errors; default fail-fast preserves existing behavior.",
+    ),
 ) -> None:
     """Execute a benchmark run and persist the artifacts under runs/."""
 
@@ -150,20 +165,28 @@ def run_command(
         dataset_name=dataset,
         system_name=system,
         limit=limit,
+        seed=seed,
         command=(
             f"wmb run --dataset {dataset} --system {system}"
             + (f" --mode {mode}" if mode is not None else "")
             + (f" --answerer {answerer}" if answerer != "deterministic" else "")
             + (f" --judge {judge}" if judge != "deterministic" else "")
             + (f" --sample {sample}" if sample is not None else "")
+            + (f" --seed {seed}" if seed != 42 else "")
+            + (f" --top-k {top_k}" if top_k is not None else "")
+            + (f" --run-name {run_name}" if run_name is not None else "")
+            + (" --continue-on-error" if continue_on_error else "")
             + (f" --limit {limit}" if limit is not None else "")
         ),
         system_options={
             **({"mode": mode} if mode is not None else {}),
             **({"answerer": answerer} if answerer is not None else {}),
+            **(_top_k_option(system, top_k) if top_k is not None else {}),
         },
         judge_mode=judge,
         sample=sample,
+        run_name=run_name,
+        continue_on_error=continue_on_error,
     )
 
     table = Table(title="Run Complete")
@@ -171,11 +194,19 @@ def run_command(
     table.add_column("Value")
     table.add_row("Run ID", manifest.run_id)
     table.add_row("Run dir", manifest.run_dir)
+    table.add_row("Completed", str(summary.completed_count))
+    table.add_row("Errors", f"{summary.error_count} ({summary.error_rate:.2%})")
     table.add_row("Accuracy", f"{summary.accuracy:.2%}")
     table.add_row(
         "Citation precision",
         f"{summary.citation_precision:.2%}" if summary.citation_precision is not None else "-",
     )
+    table.add_row(
+        "Citation source F1",
+        f"{summary.citation_source_f1:.2%}" if summary.citation_source_f1 is not None else "-",
+    )
+    table.add_row("Stale citation rate", f"{summary.stale_citation_rate:.2%}")
+    table.add_row("Unsupported answer rate", f"{summary.unsupported_answer_rate:.2%}")
     table.add_row("Avg wiki pages", f"{summary.avg_wiki_size_pages:.2f}")
     table.add_row("Avg wiki tokens", f"{summary.avg_wiki_size_tokens:.2f}")
     table.add_row("Avg latency", f"{summary.avg_latency_ms:.2f} ms")

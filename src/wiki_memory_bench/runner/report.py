@@ -25,11 +25,28 @@ def render_report(run_path_text: str, show_prompts: bool = False) -> None:
     overview.add_row("Dataset", summary.dataset_name)
     overview.add_row("System", summary.system_name)
     overview.add_row("Examples", str(summary.example_count))
+    overview.add_row("Completed", str(summary.completed_count))
+    overview.add_row("Errors", f"{summary.error_count} ({summary.error_rate:.2%})")
     overview.add_row("Accuracy", f"{summary.accuracy:.2%}")
     overview.add_row(
         "Citation precision",
         f"{summary.citation_precision:.2%}" if summary.citation_precision is not None else "-",
     )
+    overview.add_row(
+        "Citation source precision",
+        f"{summary.citation_source_precision:.2%}" if summary.citation_source_precision is not None else "-",
+    )
+    overview.add_row(
+        "Citation source recall",
+        f"{summary.citation_source_recall:.2%}" if summary.citation_source_recall is not None else "-",
+    )
+    overview.add_row(
+        "Citation source F1",
+        f"{summary.citation_source_f1:.2%}" if summary.citation_source_f1 is not None else "-",
+    )
+    overview.add_row("Stale citation rate", f"{summary.stale_citation_rate:.2%}")
+    overview.add_row("Unsupported answer rate", f"{summary.unsupported_answer_rate:.2%}")
+    overview.add_row("Correct answer bad citation rate", f"{summary.answer_correct_but_bad_citation_rate:.2%}")
     overview.add_row("Avg wiki pages", f"{summary.avg_wiki_size_pages:.2f}")
     overview.add_row("Avg wiki tokens", f"{summary.avg_wiki_size_tokens:.2f}")
     overview.add_row("Avg latency", f"{summary.avg_latency_ms:.2f} ms")
@@ -65,7 +82,10 @@ def render_report(run_path_text: str, show_prompts: bool = False) -> None:
     per_example.add_column("Question Type")
     per_example.add_column("Selected")
     per_example.add_column("Correct")
+    per_example.add_column("Status")
     per_example.add_column("Citation", justify="right")
+    per_example.add_column("Source F1", justify="right")
+    per_example.add_column("Citation Mode")
     per_example.add_column("Wiki Pages", justify="right")
     per_example.add_column("Wiki Tokens", justify="right")
     per_example.add_column("Latency (ms)", justify="right")
@@ -79,7 +99,10 @@ def render_report(run_path_text: str, show_prompts: bool = False) -> None:
             result.question_type,
             result.selected_choice_text or result.answer_text or "-",
             "yes" if result.is_correct else "no",
+            result.status,
             "-" if result.citation_precision is None else f"{result.citation_precision:.2f}",
+            "-" if result.metadata.get("citation_source_f1") is None else f"{float(result.metadata['citation_source_f1']):.2f}",
+            str(result.metadata.get("metric_mode", "-")),
             str(result.wiki_size_pages or 0),
             str(result.wiki_size_tokens or 0),
             f"{result.latency_ms:.2f}",
@@ -88,6 +111,26 @@ def render_report(run_path_text: str, show_prompts: bool = False) -> None:
             str(result.token_usage.total_tokens),
         )
     console.print(per_example)
+
+    error_results = [result for result in results if result.status == "error"]
+    if error_results:
+        errors = Table(title="Errors")
+        errors.add_column("Example ID")
+        errors.add_column("Question Type")
+        errors.add_column("Error Type")
+        errors.add_column("Message")
+        errors.add_column("Latency (ms)", justify="right")
+        errors.add_column("Traceback")
+        for result in error_results:
+            errors.add_row(
+                result.example_id,
+                result.question_type,
+                result.error_type or "-",
+                (result.error_message or "-")[:120],
+                f"{result.latency_ms:.2f}",
+                result.traceback_path or "-",
+            )
+        console.print(errors)
 
     if show_prompts:
         prompt_files = sorted((run_dir / "artifacts" / "llm").rglob("*.json")) if (run_dir / "artifacts" / "llm").exists() else []

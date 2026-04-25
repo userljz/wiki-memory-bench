@@ -53,9 +53,8 @@ class BM25Baseline(SystemAdapter):
 
     name = "bm25"
     description = "Retrieves session summaries and full sessions with a local BM25 scorer before choosing an answer."
-    top_k = 4
-
-    def __init__(self, answerer: str = "deterministic", **_: object) -> None:
+    def __init__(self, answerer: str = "deterministic", top_k: int = 4, **_: object) -> None:
+        self.top_k = top_k
         self.answerer_mode = answerer
         self.answerer = build_answerer(answerer, task_name="mc-answerer")
         self.open_qa_answerer = build_open_qa_answerer(answerer, task_name="open-qa-answerer")
@@ -89,7 +88,6 @@ class BM25Baseline(SystemAdapter):
             for index, (clip, score) in enumerate(retrieved_pairs)
         ]
 
-        latency_ms = (perf_counter() - started) * 1000.0
         citations = []
         if example.task_type == TaskType.MULTIPLE_CHOICE:
             selection = self.answerer.select_choice(example, retrieved_items)
@@ -107,6 +105,7 @@ class BM25Baseline(SystemAdapter):
                 [item.text for item in retrieved_items] + [example.question] + [choice.text for choice in example.choices]
             )
             output_tokens = estimate_text_tokens(selected_choice.text)
+            latency_ms = (perf_counter() - started) * 1000.0
 
             return SystemResult(
                 example_id=example.example_id,
@@ -143,6 +142,7 @@ class BM25Baseline(SystemAdapter):
 
         input_tokens = estimate_token_total([item.text for item in retrieved_items] + [example.question])
         output_tokens = estimate_text_tokens(selection.answer_text)
+        latency_ms = (perf_counter() - started) * 1000.0
         return SystemResult(
             example_id=example.example_id,
             system_name=self.name,

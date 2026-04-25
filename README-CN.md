@@ -26,7 +26,7 @@ Benchmark Markdown/Wiki memory systems for LLM agents.
 - `Markdown / Wiki memory`：项目明确针对把记忆编译成 Markdown 页面、wiki 笔记或类似本地 artifact 的系统。
 - `人工精选 clips`：不仅支持完整原始历史，也支持“人类实际会保留下来”的 clips / sessions。
 - `stale claim 与 update diagnostics`：synthetic 任务会显式覆盖更新、矛盾、过时 claim 和 forgetting 行为。
-- `citation precision`：不仅看答对没有，也看引用是否真的落在相关证据上。
+- `evidence-aware citation metrics`：不仅看答对没有，也看 source precision/recall/F1、stale citations、unsupported answers；没有 source id 时才回退到 quote matching。
 - `token / latency tracking`：每次 run 都记录检索成本、token 估计和延迟，便于看工程权衡。
 - `可复现 CLI harness`：评测流程由 `uv` + Typer CLI、标准化 adapter、保存下来的 artifacts 和显式报告驱动。
 
@@ -43,6 +43,11 @@ uv run wmb systems list
 uv run wmb run --dataset synthetic-mini --system bm25 --limit 5
 uv run wmb report runs/latest
 ```
+
+默认情况下，`wmb run` 是 fail-fast：system、evaluation 或 judge 抛异常会立刻终止。
+如果要做批量诊断，可以使用 `--continue-on-error`；runner 会继续后续样本，把失败样本写入
+`predictions.jsonl`，把 traceback 保存到 `artifacts/errors/`，并在 summary 中报告
+`error_count` / `error_rate`。
 
 如果你想跑一个更接近 wiki-memory 场景、但依然不需要 API key 的诊断路径：
 
@@ -117,6 +122,8 @@ deterministic alpha rows 混成同一个 leaderboard。
 - 它不是最终的 scientific leaderboard
 - 它**不能**证明 `clipwiki` 在总体上优于 `vector-rag`
 - 如果生成后的报告再被提交，后续 commit 可能包含报告文件本身，而 `evaluated_source_commit` 仍然表示实际被评测的源码 commit
+- oracle rows 只是 upper bounds，不能纳入公平的 non-oracle 系统比较
+- ClipWiki 的 `full-wiki` 和 `curated` 是 non-oracle mode；只有 `oracle-curated` 可以使用 gold evidence labels
 
 | 数据集 | 系统 | Mode | Status | Uses Gold Labels | Dependency Mode | Accuracy | Citation Precision |
 | --- | --- | --- | --- | --- | --- | ---: | ---: |

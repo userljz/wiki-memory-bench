@@ -97,11 +97,11 @@ class _BaseFullContextBaseline(SystemAdapter):
                     )
                 )
 
-            latency_ms = (perf_counter() - started) * 1000.0
             input_tokens = estimate_token_total(
                 [clip.text for clip in ordered_clips] + [example.question] + [choice.text for choice in example.choices]
             )
             output_tokens = estimate_text_tokens(selected_choice.text)
+            latency_ms = (perf_counter() - started) * 1000.0
 
             return SystemResult(
                 example_id=example.example_id,
@@ -141,9 +141,9 @@ class _BaseFullContextBaseline(SystemAdapter):
                     )
                 )
 
-        latency_ms = (perf_counter() - started) * 1000.0
         input_tokens = estimate_token_total([clip.text for clip in ordered_clips] + [example.question])
         output_tokens = estimate_text_tokens(selection.answer_text)
+        latency_ms = (perf_counter() - started) * 1000.0
         return SystemResult(
             example_id=example.example_id,
             system_name=self.name,

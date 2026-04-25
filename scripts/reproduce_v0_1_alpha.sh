@@ -136,6 +136,16 @@ def option_value(flag: str) -> str | None:
 
 def classify_gold_usage(system_name: str, metadata: dict[str, object]) -> tuple[str, bool, str]:
     mode = str(metadata.get("clipwiki_mode") or option_value("--mode") or "default")
+    if "uses_gold_labels" in metadata:
+        uses_gold_labels = bool(metadata.get("uses_gold_labels"))
+        oracle_label = str(metadata.get("oracle_label") or ("oracle" if uses_gold_labels else "non-oracle"))
+        fields = metadata.get("gold_label_fields_used", [])
+        detail = (
+            f"System metadata reports gold label fields used: {fields}."
+            if uses_gold_labels
+            else "System metadata reports no gold labels are used during retrieval or answering for this row."
+        )
+        return oracle_label, uses_gold_labels, detail
     if system_name in {"full-context-oracle", "full-context"}:
         return (
             "oracle",
@@ -171,24 +181,43 @@ oracle_label, uses_gold_labels, gold_usage_detail = classify_gold_usage(summary[
 mode = str(metadata.get("clipwiki_mode") or option_value("--mode") or "default")
 answerer_mode = str(metadata.get("answerer_mode") or os.environ["ANSWERER"])
 vector_installed = os.environ["VECTOR_DEPENDENCY_INSTALLED"].lower() == "true"
+dataset_metadata = manifest.get("dataset_metadata", {})
+requested_config = dataset_metadata.get("requested_config", {})
+prepared_cache = dataset_metadata.get("prepared_cache", {})
+source_metadata = dataset_metadata.get("source_metadata") or prepared_cache.get("source") or {}
 
 record = {
     "status": "ok",
     "dataset": summary["dataset_name"],
+    "split": requested_config.get("split") or "default",
     "system": summary["system_name"],
     "mode": mode,
     "answerer": answerer_mode,
+    "judge": manifest.get("judge", "deterministic"),
     "oracle_label": oracle_label,
     "uses_gold_labels": uses_gold_labels,
     "gold_usage_detail": gold_usage_detail,
+    "system_options": manifest.get("system_options", {}),
     "external_adapter_mode": adapter_mode(summary["system_name"], metadata),
     "dependency_mode": dependency_mode(summary["system_name"], vector_installed),
     "vector_dependency_installed": vector_installed,
     "limit": manifest.get("limit"),
+    "examples": summary.get("example_count"),
+    "completed_count": summary.get("completed_count"),
+    "error_count": summary.get("error_count"),
     "accuracy": summary.get("accuracy"),
     "citation_precision": summary.get("citation_precision"),
+    "citation_source_precision": summary.get("citation_source_precision"),
+    "citation_source_recall": summary.get("citation_source_recall"),
+    "citation_source_f1": summary.get("citation_source_f1"),
+    "stale_citation_rate": summary.get("stale_citation_rate"),
+    "unsupported_answer_rate": summary.get("unsupported_answer_rate"),
+    "answer_correct_but_bad_citation_rate": summary.get("answer_correct_but_bad_citation_rate"),
     "avg_latency_ms": summary.get("avg_latency_ms"),
     "avg_retrieved_tokens": summary.get("avg_retrieved_tokens"),
+    "avg_wiki_tokens": summary.get("avg_wiki_size_tokens"),
+    "dataset_source": source_metadata,
+    "prepared_cache": prepared_cache,
     "command": command_string,
     "notes": os.environ["NOTES"],
     "known_limitations": os.environ["LIMITATIONS"],
@@ -282,20 +311,35 @@ oracle_label, uses_gold_labels, gold_usage_detail = classify_gold_usage(system_n
 record = {
     "status": "skipped",
     "dataset": os.environ["DATASET"],
+    "split": "default",
     "system": system_name,
     "mode": mode,
     "answerer": os.environ["ANSWERER"],
+    "judge": "deterministic",
     "oracle_label": oracle_label,
     "uses_gold_labels": uses_gold_labels,
     "gold_usage_detail": gold_usage_detail,
+    "system_options": {"mode": mode} if mode != "default" else {},
     "external_adapter_mode": "n/a",
     "dependency_mode": "vector-extra-missing" if system_name == "vector-rag" else "core",
     "vector_dependency_installed": vector_installed,
     "limit": int(os.environ["LIMIT"]),
+    "examples": None,
+    "completed_count": 0,
+    "error_count": None,
     "accuracy": None,
     "citation_precision": None,
+    "citation_source_precision": None,
+    "citation_source_recall": None,
+    "citation_source_f1": None,
+    "stale_citation_rate": None,
+    "unsupported_answer_rate": None,
+    "answer_correct_but_bad_citation_rate": None,
     "avg_latency_ms": None,
     "avg_retrieved_tokens": None,
+    "avg_wiki_tokens": None,
+    "dataset_source": {},
+    "prepared_cache": {},
     "command": command_string,
     "notes": os.environ["NOTES"],
     "known_limitations": os.environ["LIMITATIONS"],
@@ -458,6 +502,31 @@ def dataset_notes() -> list[str]:
     return rows
 
 
+def dataset_source_notes(records: list[dict[str, object]]) -> list[str]:
+    rows: list[str] = []
+    for record in records:
+        source = record.get("dataset_source") or {}
+        cache = record.get("prepared_cache") or {}
+        if isinstance(source, dict):
+            source_id = source.get("identifier") or source.get("path") or "not recorded"
+            checksum = source.get("checksum_sha256") or "not recorded"
+        else:
+            source_id = "not recorded"
+            checksum = "not recorded"
+        cache_request = cache.get("request") if isinstance(cache, dict) else None
+        rows.append(
+            f"- `{record['dataset']} + {record['system']}`: source=`{source_id}`, checksum=`{checksum}`, prepared_cache_request=`{cache_request or 'not used'}`"
+        )
+    return rows
+
+
+def system_option_notes(records: list[dict[str, object]]) -> list[str]:
+    return [
+        f"- `{record['dataset']} + {record['system']}`: system_options=`{record.get('system_options', {})}`, answerer=`{record.get('answerer')}`, judge=`{record.get('judge')}`"
+        for record in records
+    ]
+
+
 def failure_analysis(records: list[dict[str, object]]) -> list[str]:
     findings: list[str] = []
 
@@ -523,9 +592,9 @@ def summarize_gold_label_usage(records: list[dict[str, object]]) -> tuple[str, s
 
 
 lines: list[str] = []
-lines.append("# v0.1-alpha Results")
+lines.append("# v0.1-alpha Technical Report")
 lines.append("")
-lines.append("This report is generated by `scripts/reproduce_v0_1_alpha.sh` and is intended to be an honest, reproducible alpha snapshot.")
+lines.append("This report is generated by `scripts/reproduce_v0_1_alpha.sh` and is intended to be an honest, reproducible alpha snapshot. It emphasizes benchmark protocol, provenance, and limitations rather than leaderboard claims.")
 lines.append("")
 any_rows_use_gold_labels, rows_using_gold_labels = summarize_gold_label_usage(records)
 vector_rag_status = summarize_vector_rag(records)
@@ -568,6 +637,14 @@ lines.extend(
     ]
 )
 lines.append("")
+lines.append("## Benchmark Protocol")
+lines.append("")
+lines.append("- Deterministic no-key evaluation is the default path.")
+lines.append("- Rows use deterministic answerers and deterministic judges unless explicitly stated otherwise.")
+lines.append("- Oracle rows and gold-evidence-selection rows are upper bounds and are excluded from fair non-oracle comparisons.")
+lines.append("- Optional LLM calibration is reported separately and is not part of this deterministic alpha table.")
+lines.append("- All commands are listed exactly below; run artifacts are saved under `runs/` with manifests, summaries, predictions, and system artifacts.")
+lines.append("")
 lines.append("## Execution Summary")
 lines.append("")
 lines.extend(
@@ -587,27 +664,39 @@ lines.append("## Datasets")
 lines.append("")
 lines.extend(dataset_notes())
 lines.append("")
+lines.append("## Dataset Source And Prepared Cache Config")
+lines.append("")
+lines.extend(dataset_source_notes(records))
+lines.append("")
+lines.append("## System Options And Modes")
+lines.append("")
+lines.extend(system_option_notes(records))
+lines.append("")
 lines.append("## Result Table")
 lines.append("")
-lines.append("| Dataset | System | Mode | Answerer | Oracle Label | Uses Gold Labels | Adapter Mode | Dependency Mode | Status | Accuracy | Citation Precision | Avg Latency (ms) | Avg Retrieved Tokens | Run ID |")
-lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |")
+lines.append("| Dataset | Split | System | Mode | Answerer | Judge | Oracle Label | Examples | Accuracy | Citation Source F1 | Citation Precision | Stale Citation Rate | Avg Latency (ms) | Avg Retrieved Tokens | Avg Wiki Tokens | Dependency Mode | Uses Gold Labels | Status |")
+lines.append("| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |")
 for record in records:
     lines.append(
-        "| {dataset} | {system} | {mode} | {answerer} | {oracle_label} | {uses_gold_labels} | {external_adapter_mode} | {dependency_mode} | {status} | {accuracy} | {citation_precision} | {latency} | {retrieved} | {run_id} |".format(
+        "| {dataset} | {split} | {system} | {mode} | {answerer} | {judge} | {oracle_label} | {examples} | {accuracy} | {citation_source_f1} | {citation_precision} | {stale_citation_rate} | {latency} | {retrieved} | {wiki_tokens} | {dependency_mode} | {uses_gold_labels} | {status} |".format(
             dataset=record["dataset"],
+            split=record.get("split", "default"),
             system=record["system"],
             mode=record["mode"],
-            answerer=record["answerer"],
-            oracle_label=record["oracle_label"],
+            answerer=record.get("answerer", "deterministic"),
+            judge=record.get("judge", "deterministic"),
+            oracle_label=record.get("oracle_label", "non-oracle"),
+            examples=fmt_metric(record.get("examples")),
             uses_gold_labels="yes" if record["uses_gold_labels"] else "no",
-            external_adapter_mode=record["external_adapter_mode"],
             dependency_mode=record["dependency_mode"],
             status=record["status"],
             accuracy=fmt_metric(record["accuracy"], pct=True),
             citation_precision=fmt_metric(record["citation_precision"], pct=True),
+            citation_source_f1=fmt_metric(record.get("citation_source_f1"), pct=True),
+            stale_citation_rate=fmt_metric(record.get("stale_citation_rate"), pct=True),
             latency=fmt_metric(record["avg_latency_ms"]),
             retrieved=fmt_metric(record["avg_retrieved_tokens"]),
-            run_id=record["run_id"] or "skipped",
+            wiki_tokens=fmt_metric(record.get("avg_wiki_tokens")),
         )
     )
 lines.append("")
@@ -627,9 +716,11 @@ else:
 lines.append("")
 lines.append("## Oracle / Non-Oracle Explanation")
 lines.append("")
-lines.append("- `oracle`: the row uses gold labels directly at runtime. If `full-context-oracle` appears in any future table, it must be interpreted as an upper bound rather than a fair deployable baseline.")
-lines.append("- `gold-evidence-selection`: the row uses gold evidence labels to choose retrieval context. A typical example is `clipwiki --mode oracle-curated`.")
-lines.append("- `non-oracle`: the row does not use gold labels during retrieval or answering. All rows in this v0.1-alpha table are intended to be interpreted under this label unless marked otherwise.")
+lines.append("- `non-oracle`: the row does not use gold labels during retrieval or answering. These rows are eligible for fair system-to-system comparisons within the limits of the benchmark slice.")
+lines.append("- `oracle`: the row uses gold labels directly at runtime and must be interpreted only as an upper bound, not as a deployable baseline.")
+lines.append("- `full-context-oracle` is an oracle upper-bound system and is excluded from fair non-oracle comparisons.")
+lines.append("- `gold-evidence-selection`: the row uses gold evidence labels to choose retrieval context. The ClipWiki mode that may do this is `clipwiki --mode oracle-curated`.")
+lines.append("- `full-wiki` and `curated` ClipWiki modes are non-oracle modes. They must not read `gold_evidence`, `answer_session_ids`, or `has_answer` labels.")
 lines.append("")
 lines.append("## Limitations")
 lines.append("")
@@ -638,10 +729,30 @@ lines.append("- `synthetic-mini` is a smoke benchmark with only five examples.")
 lines.append("- `synthetic-wiki-memory` and `locomo-mc10` rows here are limited-slice alpha runs, not exhaustive leaderboard measurements.")
 lines.append("- Optional dependency rows depend on the local environment; `vector-rag` is only run when the vector stack is installed.")
 lines.append("- Poor-performing rows are intentionally retained. This report does not hide failures to improve presentation.")
+lines.append("- Citation source metrics are only as good as the available `expected_source_ids`; rows without source ids may rely on quote fallback behavior.")
+lines.append("")
+lines.append("## What This Benchmark Does Not Prove")
+lines.append("")
+lines.append("- It does not establish that ClipWiki is superior to vector RAG or any other baseline.")
+lines.append("- It does not establish a production leaderboard.")
+lines.append("- It does not measure all possible memory architectures, retrieval stacks, or LLM providers.")
+lines.append("- It does not replace larger-scale human or real-world agent memory evaluation.")
 lines.append("")
 lines.append("## Failure Analysis")
 lines.append("")
 lines.extend(failure_analysis(records))
+lines.append("")
+lines.append("## Per-System Failure Analysis")
+lines.append("")
+for record in records:
+    lines.append(f"- `{record['dataset']} + {record['system']}`: status=`{record['status']}`, accuracy=`{fmt_metric(record.get('accuracy'), pct=True)}`, citation_source_f1=`{fmt_metric(record.get('citation_source_f1'), pct=True)}`, stale_citation_rate=`{fmt_metric(record.get('stale_citation_rate'), pct=True)}`. Notes: {record.get('known_limitations', '')}")
+lines.append("")
+lines.append("## Next Steps")
+lines.append("")
+lines.append("- Re-run this report from a clean release commit before treating it as a final public artifact.")
+lines.append("- Expand source-aware citation coverage for public datasets where evidence ids are available.")
+lines.append("- Keep optional LLM calibration separate from deterministic no-key results.")
+lines.append("- Add broader LongMemEval and external adapter coverage only after preserving provenance and fair-comparison boundaries.")
 lines.append("")
 lines.append("## Reproduction Commands")
 lines.append("")

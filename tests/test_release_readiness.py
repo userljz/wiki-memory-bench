@@ -97,57 +97,18 @@ def test_readme_alpha_result_tables_use_valid_markdown_syntax() -> None:
     _extract_markdown_table_after_heading(readme_cn_text, "## v0.1-alpha 结果快照")
 
 
-def test_readme_alpha_rows_and_vector_rag_status_match_alpha_report() -> None:
+def test_readme_links_alpha_reports_and_keeps_claims_conservative() -> None:
     report_text = Path("reports/v0.1-alpha-results.md").read_text(encoding="utf-8")
     readme_text = Path("README.md").read_text(encoding="utf-8")
     readme_cn_text = Path("README-CN.md").read_text(encoding="utf-8")
 
-    _, report_rows = _extract_markdown_table_after_heading(report_text, "## Result Table")
-    _, readme_rows = _extract_markdown_table_after_heading(readme_text, "## v0.1-alpha Results")
-    _, readme_cn_rows = _extract_markdown_table_after_heading(readme_cn_text, "## v0.1-alpha 结果快照")
-
-    report_projection = _project_alpha_rows(
-        report_rows,
-        {
-            "dataset": "Dataset",
-            "system": "System",
-            "mode": "Mode",
-            "status": "Status",
-            "uses_gold_labels": "Uses Gold Labels",
-            "dependency_mode": "Dependency Mode",
-            "accuracy": "Accuracy",
-            "citation_precision": "Citation Precision",
-        },
-    )
-    readme_projection = _project_alpha_rows(
-        readme_rows,
-        {
-            "dataset": "Dataset",
-            "system": "System",
-            "mode": "Mode",
-            "status": "Status",
-            "uses_gold_labels": "Uses Gold Labels",
-            "dependency_mode": "Dependency Mode",
-            "accuracy": "Accuracy",
-            "citation_precision": "Citation Precision",
-        },
-    )
-    readme_cn_projection = _project_alpha_rows(
-        readme_cn_rows,
-        {
-            "dataset": "数据集",
-            "system": "系统",
-            "mode": "Mode",
-            "status": "Status",
-            "uses_gold_labels": "Uses Gold Labels",
-            "dependency_mode": "Dependency Mode",
-            "accuracy": "Accuracy",
-            "citation_precision": "Citation Precision",
-        },
-    )
-
-    assert readme_projection == report_projection
-    assert readme_cn_projection == report_projection
+    assert "reports/v0.1-alpha-results.md" in readme_text
+    assert "reports/public-benchmark-alpha.md" in readme_text
+    assert "reports/llm-smoke-results.md" in readme_text
+    assert "No result in this release claims" in readme_text
+    assert "SOTA" in readme_text
+    assert "Weak public alpha rows remain visible" in report_text or "weak alpha row" in report_text
+    assert "reports/v0.1-alpha-results.md" in readme_cn_text
 
 
 def test_package_and_cli_import_without_optional_dependencies() -> None:

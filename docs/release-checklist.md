@@ -5,7 +5,7 @@
 Before a public `v0.1-alpha` announcement, set or review:
 
 - repository description:
-  - `Benchmark Markdown/Wiki memory systems for LLM agents.`
+  - `A reproducible CLI benchmark harness for Markdown/Wiki-style LLM agent memory.`
 - pinned README links
 - license visibility
 - issue / discussion settings
@@ -23,11 +23,23 @@ Suggested GitHub topics:
 - `long-term-memory`
 - `mcp`
 
+Suggested short description for pinned/release surfaces:
+
+```text
+A reproducible CLI benchmark harness for Markdown/Wiki-style LLM agent memory.
+```
+
+Suggested topics as one comma-separated line:
+
+```text
+llm, agents, memory, benchmark, evals, rag, markdown, wiki, long-term-memory, mcp
+```
+
 With GitHub CLI, after authenticating:
 
 ```bash
 gh repo edit userljz/wiki-memory-bench \
-  --description "Benchmark Markdown/Wiki memory systems for LLM agents." \
+  --description "A reproducible CLI benchmark harness for Markdown/Wiki-style LLM agent memory." \
   --add-topic llm \
   --add-topic agents \
   --add-topic memory \

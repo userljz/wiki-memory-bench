@@ -9,6 +9,7 @@ They are useful for reproducibility, auditability, and debugging, but they are n
 - point-in-time snapshots tied to a specific commit, environment, and command set
 - generated outputs from scripts such as `scripts/reproduce_v0_1_alpha.sh`
 - honest records that should keep weak or poor-performing rows visible
+- citation reports now prefer evidence-aware source metrics when `expected_source_ids` are available, and fall back to quote matching only when source ids are unavailable
 
 Generated reports distinguish between:
 

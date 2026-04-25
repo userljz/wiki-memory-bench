@@ -195,6 +195,10 @@ class EvaluatedExampleResult(BaseModel):
     question_id: str
     question_type: str
     system_name: str
+    status: str = "ok"
+    error_type: str | None = None
+    error_message: str | None = None
+    traceback_path: str | None = None
     selected_choice_id: str | None = None
     selected_choice_index: int | None = None
     selected_choice_text: str | None = None
@@ -227,6 +231,18 @@ class RunManifest(BaseModel):
     run_dir: str
     example_count: int
     limit: int | None = None
+    sample: int | None = None
+    seed: int = 42
+    run_name: str | None = None
+    system_options: dict[str, Any] = Field(default_factory=dict)
+    answerer: str = "deterministic"
+    judge: str = "deterministic"
+    dataset_metadata: dict[str, Any] = Field(default_factory=dict)
+    package_version: str | None = None
+    python_version: str | None = None
+    git_commit: str | None = None
+    git_dirty: bool | None = None
+    git_status: str | None = None
     command: str | None = None
 
 
@@ -238,6 +254,9 @@ class RunSummary(BaseModel):
     dataset_name: str
     system_name: str
     example_count: int
+    completed_count: int = 0
+    error_count: int = 0
+    error_rate: float = 0.0
     correct_count: int
     accuracy: float
     accuracy_by_question_type: dict[str, float] = Field(default_factory=dict)
@@ -250,6 +269,12 @@ class RunSummary(BaseModel):
     avg_estimated_cost_usd: float = 0.0
     total_estimated_cost_usd: float = 0.0
     citation_precision: float | None = None
+    citation_source_precision: float | None = None
+    citation_source_recall: float | None = None
+    citation_source_f1: float | None = None
+    stale_citation_rate: float = 0.0
+    answer_correct_but_bad_citation_rate: float = 0.0
+    unsupported_answer_rate: float = 0.0
     diagnostic_metrics: dict[str, float] = Field(default_factory=dict)
     avg_wiki_size_pages: float = 0.0
     avg_wiki_size_tokens: float = 0.0
@@ -258,3 +283,6 @@ class RunSummary(BaseModel):
     total_retrieved_chunk_count: int = 0
     avg_retrieved_tokens: float = 0.0
     total_retrieved_tokens: int = 0
+    oracle_label: str = "non-oracle"
+    uses_gold_labels: bool = False
+    oracle_mode: bool = False

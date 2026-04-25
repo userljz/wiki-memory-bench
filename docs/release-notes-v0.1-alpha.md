@@ -1,33 +1,25 @@
-# Release Notes: v0.1.0-alpha
+# Release Notes: v0.1-alpha
 
-`wiki-memory-bench` is a benchmark and evaluation harness for Markdown/Wiki memory systems used by LLM agents.
+`wiki-memory-bench` is a reproducible CLI benchmark harness for Markdown/Wiki-style LLM agent memory.
 
-This first public alpha focuses on reproducibility, transparent reporting, and engineering-oriented diagnostics rather than benchmark marketing.
+This alpha release is about protocol, artifacts, and honest baseline reporting. It is not a SOTA claim and it is not a production leaderboard.
 
 ## What Works
 
-- Deterministic benchmark execution through the CLI
-- Saved run artifacts under `runs/`
-- Reproducible alpha report generation
-- Public deterministic slices on:
-  - `synthetic-mini`
-  - `synthetic-wiki-memory`
-  - `locomo-mc10`
-  - `longmemeval-s`
-- Baselines and systems:
-  - `bm25`
-  - `vector-rag`
-  - `clipwiki`
-  - `full-context-heuristic`
-  - `full-context-oracle` as a clearly separated oracle upper bound
+- Deterministic no-key CLI runs.
+- Local run storage under `runs/` with manifest, summary, predictions, and artifacts.
+- Built-in deterministic systems: `bm25`, `vector-rag`, `clipwiki`, `full-context-heuristic`, and `full-context-oracle`.
+- Optional external adapter path for `basic-memory`.
+- Optional LiteLLM answerer / judge paths for credentialed calibration.
+- Evidence-aware citation metrics for rows with `expected_source_ids`.
 
-## What Is Still Alpha
+## Benchmark Protocol
 
-- Public benchmark coverage is still narrow
-- Some rows are small-limit slices rather than full experimental sweeps
-- Optional LLM smoke evaluation exists, but it is manual and credential-gated
-- A credentialed OpenRouter smoke report is available as optional calibration, not as a leaderboard
-- Weak rows remain visible because hiding them would reduce benchmark credibility
+- Default runs use deterministic answerers and deterministic judges.
+- Optional LLM calibration is manual and kept separate from deterministic alpha results.
+- Oracle rows are upper bounds and are excluded from fair non-oracle comparisons.
+- `clipwiki --mode full-wiki` is non-oracle; only `clipwiki --mode oracle-curated` may use gold evidence labels.
+- Dirty report generation requires `WMB_ALLOW_DIRTY_REPORT=1` and must record the dirty state.
 
 ## Supported Datasets
 
@@ -45,117 +37,38 @@ This first public alpha focuses on reproducibility, transparent reporting, and e
 - `clipwiki`
 - `full-context-heuristic`
 - `full-context-oracle`
-- experimental external adapters such as `basic-memory`
-
-## How To Reproduce
-
-Deterministic alpha snapshot:
-
-```bash
-uv sync --group dev --extra vector
-uv run pytest -vv
-./scripts/reproduce_v0_1_alpha.sh
-```
-
-Optional LLM smoke calibration:
-
-```bash
-uv sync --group dev --extra llm --extra vector
-export WMB_RUN_LLM_INTEGRATION=1
-export LLM_MODEL="your-model"
-export LLM_API_KEY="your-api-key"
-./scripts/reproduce_llm_smoke.sh
-```
-
-## Public Reports
-
-- Release report: `reports/v0.1-alpha-results.md`
-- Public benchmark slice: `reports/public-benchmark-alpha.md`
-- Optional LLM smoke calibration: `reports/llm-smoke-results.md`
-
-## Known Limitations
-
-- This release does not claim benchmark leadership.
-- No oracle row is included in the main non-oracle table.
-- `locomo-mc10` remains difficult for all non-oracle deterministic baselines in the current slice.
-- Optional LLM smoke rows are provider-dependent calibration results and are not final leaderboard claims.
-- This release is not published to PyPI.
-
-## GitHub Release Draft
-
-Use this body for the GitHub release tagged `v0.1.0-alpha`:
-
-```markdown
-# v0.1.0-alpha
-
-`wiki-memory-bench` is a benchmark and evaluation harness for Markdown/Wiki memory systems used by LLM agents.
-
-This first public alpha focuses on reproducibility, transparent reporting, and engineering-oriented diagnostics rather than benchmark marketing.
-
-## What Works
-
-- Deterministic benchmark execution through the CLI
-- Saved run artifacts under `runs/`
-- Reproducible alpha report generation
-- Deterministic public slices for `synthetic-mini`, `synthetic-wiki-memory`, and `locomo-mc10`
-- Optional manual LLM smoke calibration with deterministic judging
-- Baselines and systems: `bm25`, `vector-rag`, `clipwiki`, `full-context-heuristic`, and `full-context-oracle`
-
-## What Is Alpha
-
-- Public benchmark coverage is still narrow
-- Some rows are small-limit engineering slices rather than full experimental sweeps
-- Weak public rows remain visible on purpose
-- Optional LLM smoke rows are provider-dependent calibration results, not leaderboard results
-- No SOTA claim is made for ClipWiki or any other system
-
-## Supported Datasets
-
-- `synthetic-mini`
-- `synthetic-wiki-memory`
-- `locomo-mc10`
-- `longmemeval-s`
-- `longmemeval-m`
-- `longmemeval-oracle`
-
-## Supported Systems
-
-- `bm25`
-- `vector-rag`
-- `clipwiki`
-- `full-context-heuristic`
-- `full-context-oracle`
-- experimental external adapters such as `basic-memory`
-
-## How To Reproduce
-
-```bash
-uv sync --group dev --extra vector
-uv run pytest -vv
-./scripts/reproduce_v0_1_alpha.sh
-```
-
-Optional LLM smoke calibration:
-
-```bash
-uv sync --group dev --extra llm --extra vector
-export WMB_RUN_LLM_INTEGRATION=1
-export LLM_MODEL="your-model"
-export LLM_API_KEY="your-api-key"
-./scripts/reproduce_llm_smoke.sh
-```
+- `basic-memory` experimental adapter
 
 ## Reports
 
-- Deterministic alpha report: [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)
-- Public benchmark slice: [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)
-- Optional LLM smoke report: [`reports/llm-smoke-results.md`](reports/llm-smoke-results.md)
+- Technical report: [`reports/v0.1-alpha-results.md`](../reports/v0.1-alpha-results.md)
+- Optional LLM smoke calibration: [`reports/llm-smoke-results.md`](../reports/llm-smoke-results.md)
+- Public benchmark slice: [`reports/public-benchmark-alpha.md`](../reports/public-benchmark-alpha.md)
+
+The current technical report records `evaluated_source_commit`, `report_generated_at`, git dirty state, exact commands, environment, dataset source/checksum, system options, answerer/judge mode, oracle/non-oracle labels, and per-system limitations.
 
 ## Known Limitations
 
-- This release does not claim benchmark leadership.
-- No oracle row is included in the main non-oracle table.
-- `locomo-mc10` remains difficult for all non-oracle deterministic baselines in the current slice.
-- Optional LLM smoke rows are manual calibration results.
+- Public rows are small alpha slices, not exhaustive experimental sweeps.
+- Weak rows remain visible; they are part of the release evidence.
+- Citation source metrics depend on source-id availability.
+- Some public dataset rows still rely on quote fallback citation behavior.
+- Optional LLM rows are provider-dependent calibration, not deterministic benchmark claims.
 - This release is not published to PyPI.
+
+## What This Release Does Not Prove
+
+- It does not prove that ClipWiki beats vector RAG.
+- It does not prove any system is SOTA.
+- It does not cover all memory architectures or production retrieval stacks.
+- It does not replace larger human or real-world long-term memory evaluation.
+
+## Reproduce
+
+```bash
+uv sync --group dev --extra vector
+uv run pytest
+WMB_ALLOW_DIRTY_REPORT=1 bash scripts/reproduce_v0_1_alpha.sh
 ```
+
+For a clean public release artifact, rerun without `WMB_ALLOW_DIRTY_REPORT=1` from a clean release commit.

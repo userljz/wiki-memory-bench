@@ -1,10 +1,12 @@
 from pathlib import Path
+import json
 
 from typer.testing import CliRunner
 
 from wiki_memory_bench.cli import app
 from wiki_memory_bench.datasets import get_dataset
 from wiki_memory_bench.datasets.synthetic_wiki_memory import (
+    TASK_TYPES,
     default_synthetic_wiki_memory_path,
     export_synthetic_wiki_memory,
     generate_synthetic_wiki_memory_cases,
@@ -25,7 +27,12 @@ def test_synthetic_wiki_memory_cases_have_valid_answers_and_unique_ids() -> None
     for case in cases:
         assert case["expected_answer"]
         assert isinstance(case["expected_source_ids"], list)
+        assert isinstance(case["stale_source_ids"], list)
+        assert isinstance(case["memory_operations"], list)
         assert isinstance(case["memory_operation_labels"], list)
+        assert case["memory_operations"] == case["memory_operation_labels"]
+        assert case["question_type"] == case["task_type"]
+        assert case["generation_template_id"] == f"{case['task_type']}:v2"
 
 
 def test_all_expected_source_ids_exist_and_stale_sources_do_not_overlap() -> None:
@@ -60,7 +67,7 @@ def test_expected_source_ids_are_covered_by_curated_clip_sessions_when_present()
 def test_curated_clips_are_present_for_non_abstention_tasks() -> None:
     cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
     for case in cases:
-        if case["task_type"] == "abstention":
+        if case["task_type"] == "abstention_when_not_in_memory":
             continue
         assert case["curated_clips"], case["case_id"]
 
@@ -71,16 +78,65 @@ def test_every_task_type_appears_in_100_case_generation() -> None:
 
     assert task_types == {
         "direct_recall",
-        "knowledge_update",
-        "stale_claim_detection",
-        "temporal_reasoning",
-        "contradiction_resolution",
-        "selective_forgetting",
+        "update_latest_fact",
+        "stale_claim_avoidance",
+        "explicit_forgetting",
+        "conflicting_sources",
+        "multi_source_aggregation",
+        "temporal_question",
         "citation_required",
-        "preference_following",
-        "multi_session_aggregation",
-        "abstention",
+        "abstention_when_not_in_memory",
+        "paraphrased_question",
     }
+
+
+def test_first_ten_cases_are_regression_fixtures_for_each_task_type() -> None:
+    cases = generate_synthetic_wiki_memory_cases(cases=10, seed=42)
+
+    assert [case["task_type"] for case in cases] == [
+        "direct_recall",
+        "update_latest_fact",
+        "stale_claim_avoidance",
+        "explicit_forgetting",
+        "conflicting_sources",
+        "multi_source_aggregation",
+        "temporal_question",
+        "citation_required",
+        "abstention_when_not_in_memory",
+        "paraphrased_question",
+    ]
+    assert [case["generation_template_id"] for case in cases] == [f"{case['task_type']}:v2" for case in cases]
+
+
+def test_some_questions_are_paraphrased_without_answer_keywords() -> None:
+    cases = generate_synthetic_wiki_memory_cases(cases=100, seed=42)
+    paraphrased_cases = [case for case in cases if case["task_type"] in {"paraphrased_question", "temporal_question"}]
+
+    assert paraphrased_cases
+    assert any(str(case["expected_answer"]).lower() not in str(case["question"]).lower() for case in paraphrased_cases)
+
+
+def test_same_seed_exports_identical_jsonl_and_different_seed_changes_valid_data(tmp_path: Path) -> None:
+    first_path = tmp_path / "first.jsonl"
+    second_path = tmp_path / "second.jsonl"
+    other_path = tmp_path / "other.jsonl"
+
+    export_synthetic_wiki_memory(cases=100, out_path=first_path, seed=42)
+    export_synthetic_wiki_memory(cases=100, out_path=second_path, seed=42)
+    export_synthetic_wiki_memory(cases=100, out_path=other_path, seed=7)
+
+    first_text = first_path.read_text(encoding="utf-8")
+    second_text = second_path.read_text(encoding="utf-8")
+    other_text = other_path.read_text(encoding="utf-8")
+    assert first_text == second_text
+    assert first_text != other_text
+
+    for line in other_text.splitlines():
+        case = json.loads(line)
+        assert case["task_type"] in set(TASK_TYPES)
+        assert case["expected_answer"]
+        assert isinstance(case["expected_source_ids"], list)
+        assert isinstance(case["memory_operations"], list)
 
 
 def test_synthetic_generate_cli_and_dataset_load(tmp_path: Path, monkeypatch) -> None:

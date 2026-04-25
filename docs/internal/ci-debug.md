@@ -66,7 +66,7 @@ Historical fix and follow-up hardening relevant to this CI issue:
 
 This verification update:
 
-- `docs/ci-debug.md`
+- `docs/internal/ci-debug.md`
 
 ## Local Command Outputs
 

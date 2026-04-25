@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from wiki_memory_bench.metrics.citations import evaluate_citations
 from wiki_memory_bench.schemas import ChoiceOption, EvaluatedExampleResult, PreparedExample, SystemResult
 from wiki_memory_bench.utils.tokens import estimate_text_tokens, normalize_text
 
@@ -50,13 +51,7 @@ def evaluate_multiple_choice(example: PreparedExample, prediction: SystemResult)
         item.retrieved_tokens if item.retrieved_tokens > 0 else estimate_text_tokens(item.text)
         for item in prediction.retrieved_items
     )
-    normalized_answer = normalize_text(example.answer or "")
-    citation_precision = prediction.citation_precision
-    if citation_precision is None:
-        citation_precision = 1.0 if (
-            normalized_answer
-            and any(normalized_answer in normalize_text(citation.quote or "") for citation in prediction.citations)
-        ) else 0.0
+    citation_eval = evaluate_citations(example, prediction)
 
     return EvaluatedExampleResult(
         example_id=example.example_id,
@@ -73,13 +68,25 @@ def evaluate_multiple_choice(example: PreparedExample, prediction: SystemResult)
         citations=prediction.citations,
         retrieved_items=prediction.retrieved_items,
         token_usage=prediction.token_usage,
-        citation_precision=citation_precision,
+        citation_precision=citation_eval.citation_precision,
         wiki_size_pages=prediction.wiki_size_pages,
         wiki_size_tokens=prediction.wiki_size_tokens,
         retrieved_token_count=retrieved_token_count,
         retrieved_chunk_count=len(prediction.retrieved_items),
         latency_ms=prediction.latency_ms,
-        metadata={**example.metadata, **prediction.metadata},
+        metadata={
+            **example.metadata,
+            **prediction.metadata,
+            "metric_mode": citation_eval.metric_mode,
+            "cited_source_ids": citation_eval.cited_source_ids,
+            "expected_source_ids": citation_eval.expected_source_ids,
+            "stale_source_ids": citation_eval.stale_source_ids,
+            "citation_source_precision": citation_eval.citation_source_precision,
+            "citation_source_recall": citation_eval.citation_source_recall,
+            "citation_source_f1": citation_eval.citation_source_f1,
+            "stale_citation_rate": citation_eval.stale_citation_rate,
+            "unsupported_answer": citation_eval.unsupported_answer,
+        },
     )
 
 

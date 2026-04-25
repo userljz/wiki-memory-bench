@@ -15,9 +15,18 @@ def create_run_dir(dataset_name: str, system_name: str) -> tuple[str, datetime, 
 
     ensure_runtime_dirs()
     started_at = datetime.now(timezone.utc)
-    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{dataset_name}-{system_name}"
+    base_run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{dataset_name}-{system_name}"
+    run_id = base_run_id
     run_dir = runs_dir() / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
+    suffix = 1
+    while True:
+        try:
+            run_dir.mkdir(parents=True, exist_ok=False)
+            break
+        except FileExistsError:
+            suffix += 1
+            run_id = f"{base_run_id}-{suffix}"
+            run_dir = runs_dir() / run_id
     (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
     return run_id, started_at, run_dir
 
@@ -74,8 +83,16 @@ def _build_summary_markdown(manifest: RunManifest, summary: RunSummary) -> str:
             f"- Dataset: `{summary.dataset_name}`",
             f"- System: `{summary.system_name}`",
             f"- Examples: `{summary.example_count}`",
+            f"- Completed examples: `{summary.completed_count}`",
+            f"- Error count: `{summary.error_count}`",
+            f"- Error rate: `{summary.error_rate:.2%}`",
             f"- Accuracy: `{summary.accuracy:.2%}`",
             f"- Citation precision: `{summary.citation_precision if summary.citation_precision is not None else '-'}`",
+            f"- Citation source precision: `{summary.citation_source_precision if summary.citation_source_precision is not None else '-'}`",
+            f"- Citation source recall: `{summary.citation_source_recall if summary.citation_source_recall is not None else '-'}`",
+            f"- Citation source F1: `{summary.citation_source_f1 if summary.citation_source_f1 is not None else '-'}`",
+            f"- Stale citation rate: `{summary.stale_citation_rate:.2%}`",
+            f"- Unsupported answer rate: `{summary.unsupported_answer_rate:.2%}`",
             f"- Avg wiki pages: `{summary.avg_wiki_size_pages:.2f}`",
             f"- Avg wiki tokens: `{summary.avg_wiki_size_tokens:.2f}`",
             f"- Avg latency: `{summary.avg_latency_ms:.2f} ms`",

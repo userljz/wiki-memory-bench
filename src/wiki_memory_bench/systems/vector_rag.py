@@ -86,8 +86,6 @@ class VectorRAGBaseline(SystemAdapter):
             for index, (document, score) in enumerate(retrieved_pairs)
         ]
 
-        latency_ms = (perf_counter() - started) * 1000.0
-
         citations = []
         if example.task_type == TaskType.MULTIPLE_CHOICE:
             selection = self.answerer.select_choice(example, retrieved_items)
@@ -105,6 +103,7 @@ class VectorRAGBaseline(SystemAdapter):
                 [item.text for item in retrieved_items] + [example.question] + [choice.text for choice in example.choices]
             )
             output_tokens = estimate_text_tokens(selected_choice.text)
+            latency_ms = (perf_counter() - started) * 1000.0
 
             return SystemResult(
                 example_id=example.example_id,
@@ -143,6 +142,7 @@ class VectorRAGBaseline(SystemAdapter):
 
         input_tokens = estimate_token_total([item.text for item in retrieved_items] + [example.question])
         output_tokens = estimate_text_tokens(selection.answer_text)
+        latency_ms = (perf_counter() - started) * 1000.0
         return SystemResult(
             example_id=example.example_id,
             system_name=self.name,
