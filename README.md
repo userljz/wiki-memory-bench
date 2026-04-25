@@ -107,7 +107,7 @@ Manual LLM calibration is documented in [`docs/llm-evaluation.md`](docs/llm-eval
 
 ## v0.1-alpha Results
 
-The current reproducible alpha report is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md). It records `evaluated_source_commit`, whether the evaluated source tree was clean, a `report_commit` note, exact commands, vector-rag status, gold-label usage, run IDs, dependency modes, and failure analysis.
+The current reproducible alpha report is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md). It records `evaluated_source_commit`, `report_generated_at`, `source_tree_status_at_generation`, a `report_file_commit_note`, exact commands, vector-rag status, gold-label usage, run IDs, dependency modes, and failure analysis.
 
 For a broader public-dataset alpha slice that separates non-oracle rows from oracle upper bounds, see [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md).
 
@@ -116,7 +116,7 @@ The table below is a condensed copy of the alpha report's `Result Table`. It is 
 - it mixes smoke rows and limited-slice alpha rows
 - it is not a final scientific leaderboard
 - it does **not** prove that `clipwiki` is generally better than `vector-rag`
-- when a generated report is later committed, `report_commit` can be newer than `evaluated_source_commit`
+- when a generated report is later committed, that later commit may contain the report file, while `evaluated_source_commit` remains the source code that was benchmarked
 
 | Dataset | System | Mode | Status | Uses Gold Labels | Dependency Mode | Accuracy | Citation Precision |
 | --- | --- | --- | --- | --- | --- | ---: | ---: |

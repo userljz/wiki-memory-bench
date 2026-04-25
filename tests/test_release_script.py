@@ -74,8 +74,10 @@ def test_reproduce_script_smoke_executes(tmp_path: Path) -> None:
     assert "synthetic-mini" in report_text
     assert "bm25" in report_text
     assert "evaluated_source_commit:" in report_text
-    assert "report_commit:" in report_text
-    assert "source_tree_status: `clean`" in report_text
+    assert "report_generated_at:" in report_text
+    assert "source_tree_status_at_generation: `clean`" in report_text
+    assert "report_file_commit_note: The source tree was clean at report generation time. The report file may be committed in a later commit." in report_text
+    assert "report_commit:" not in report_text
     assert "vector_rag_status:" in report_text
     assert "any_rows_use_gold_labels:" in report_text
 
@@ -122,17 +124,21 @@ def test_reproduce_script_fails_on_dirty_tree_unless_override_set(tmp_path: Path
 
     assert pass_result.returncode == 0, pass_result.stderr or pass_result.stdout
     report_text = (tmp_path / "dirty-reports-override" / "v0.1-alpha-results.md").read_text(encoding="utf-8")
-    assert "source_tree_status: `dirty`" in report_text
-    assert "source_tree_clean: `no`" in report_text
+    assert "source_tree_status_at_generation: `dirty`" in report_text
+    assert "report_file_commit_note: WARNING:" in report_text
+    assert "### Dirty Source Warning" in report_text
+    assert "WMB_ALLOW_DIRTY_REPORT=1 was set." in report_text
     assert "requires the same commit plus the local diff shown below" in report_text
 
 
-def test_alpha_report_includes_commit_hash_and_exact_commands() -> None:
+def test_alpha_report_includes_provenance_and_exact_commands() -> None:
     report_text = Path("reports/v0.1-alpha-results.md").read_text(encoding="utf-8")
 
     assert "evaluated_source_commit:" in report_text
-    assert "report_commit:" in report_text
-    assert "source_tree_status: `clean`" in report_text
+    assert "report_generated_at:" in report_text
+    assert "source_tree_status_at_generation: `clean`" in report_text
+    assert "report_file_commit_note:" in report_text
+    assert "report_commit:" not in report_text
     assert "## Exact Commands" in report_text
     assert "uv run wmb run --dataset synthetic-mini --system bm25 --limit 5" in report_text
 
@@ -168,7 +174,9 @@ def test_smoke_generated_alpha_report_commit_hash_matches_current_head(tmp_path:
     assert result.returncode == 0, result.stderr or result.stdout
     report_text = (report_dir / "v0.1-alpha-results.md").read_text(encoding="utf-8")
     assert f"evaluated_source_commit: `{head_sha}`" in report_text
-    assert "source_tree_status: `clean`" in report_text
+    assert "source_tree_status_at_generation: `clean`" in report_text
+    assert "The source tree was clean at report generation time. The report file may be committed in a later commit." in report_text
+    assert "report_commit:" not in report_text
 
 
 def test_alpha_report_marks_oracle_systems_and_keeps_weak_rows_visible() -> None:

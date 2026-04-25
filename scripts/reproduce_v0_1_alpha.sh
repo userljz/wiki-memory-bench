@@ -61,7 +61,7 @@ fi
 echo "== Environment Info =="
 echo "UTC Timestamp: $TIMESTAMP_UTC"
 echo "Repository: $ROOT_DIR"
-echo "Git commit: $GIT_COMMIT_HASH"
+echo "Evaluated source commit: $EVALUATED_SOURCE_COMMIT"
 echo "OS: $OS_SUMMARY"
 echo "Python: $PYTHON_VERSION"
 echo "uv: $UV_VERSION"
@@ -423,6 +423,18 @@ synthetic_out = os.environ["SYNTHETIC_OUT"]
 smoke_only = os.environ["SMOKE_ONLY"] == "1"
 allow_dirty_report = os.environ["WMB_ALLOW_DIRTY_REPORT"] == "1"
 source_tree_status = "clean" if git_status_summary == "clean" else "dirty"
+if source_tree_status == "clean":
+    report_file_commit_note = (
+        "The source tree was clean at report generation time. "
+        "The report file may be committed in a later commit."
+    )
+else:
+    report_file_commit_note = (
+        "WARNING: This report was generated from a dirty source tree with "
+        "WMB_ALLOW_DIRTY_REPORT=1. The evaluated_source_commit alone is not "
+        "sufficient to reproduce the report; the local working-tree diff listed "
+        "below is also part of the evaluated state."
+    )
 
 
 def fmt_metric(value, pct: bool = False) -> str:
@@ -523,14 +535,21 @@ lines.append("")
 lines.extend(
     [
         f"- evaluated_source_commit: `{evaluated_source_commit}`",
-        "- report_commit: not available at generation time. If this markdown file is later committed, that commit will usually be newer than `evaluated_source_commit`; prefer workflow artifacts for exact post-commit reproducibility.",
-        f"- source_tree_status: `{source_tree_status}`",
-        f"- source_tree_clean: `{'yes' if source_tree_status == 'clean' else 'no'}`",
-        f"- report_generated_at_utc: `{timestamp_utc}`",
+        f"- report_generated_at: `{timestamp_utc}`",
+        f"- source_tree_status_at_generation: `{source_tree_status}`",
+        f"- report_file_commit_note: {report_file_commit_note}",
     ]
 )
 lines.append("")
 if git_status_summary != "clean":
+    lines.append("### Dirty Source Warning")
+    lines.append("")
+    lines.append("```text")
+    lines.append("WARNING: WMB_ALLOW_DIRTY_REPORT=1 was set.")
+    lines.append("This report includes uncommitted local changes in addition to the evaluated source commit.")
+    lines.append("Do not interpret evaluated_source_commit as a complete reproduction reference without the dirty tree details below.")
+    lines.append("```")
+    lines.append("")
     lines.append("### Source Tree Details")
     lines.append("")
     lines.append("```text")

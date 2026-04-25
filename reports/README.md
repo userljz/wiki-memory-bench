@@ -13,9 +13,15 @@ They are useful for reproducibility, auditability, and debugging, but they are n
 Generated reports distinguish between:
 
 - `evaluated_source_commit`: the source commit used when the benchmark run itself was executed
-- `report_commit`: the later commit that may add or update the generated markdown file in git history
+- `report_generated_at`: the time the report file was generated
+- `source_tree_status_at_generation`: whether the source tree was clean or dirty when the report was generated
+- `report_file_commit_note`: a plain-language note explaining that the report file may be committed after the benchmarked source commit
 
-Those two values are often different. A committed report cannot honestly contain the hash of the commit that will only exist after the generated file is added.
+The evaluated source commit and the eventual commit containing the report file
+are often different. A committed report cannot honestly contain the hash of the
+commit that will only exist after the generated file is added. If the working
+tree is dirty, report generation requires `WMB_ALLOW_DIRTY_REPORT=1` and the
+report includes a prominent warning plus the dirty tree details.
 
 ## What These Reports Are Not
 

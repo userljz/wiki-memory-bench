@@ -107,7 +107,7 @@ deterministic alpha rows 混成同一个 leaderboard。
 
 ## v0.1-alpha 结果快照
 
-当前可复现的 alpha 报告在 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。其中包含 `evaluated_source_commit`、评测源码树是否干净、`report_commit` 说明、精确命令、vector-rag 状态、gold-label 使用情况、run ID、依赖模式和 failure analysis。
+当前可复现的 alpha 报告在 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。其中包含 `evaluated_source_commit`、`report_generated_at`、`source_tree_status_at_generation`、`report_file_commit_note`、精确命令、vector-rag 状态、gold-label 使用情况、run ID、依赖模式和 failure analysis。
 
 如果你想看更偏公共数据集的 alpha slice，并且把 non-oracle 行和 oracle upper bound 分开看，请参考 [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)。
 
@@ -116,7 +116,7 @@ deterministic alpha rows 混成同一个 leaderboard。
 - 它混合了 smoke 行和 limited-slice alpha 行
 - 它不是最终的 scientific leaderboard
 - 它**不能**证明 `clipwiki` 在总体上优于 `vector-rag`
-- 如果生成后的报告再被提交，`report_commit` 可能会晚于 `evaluated_source_commit`
+- 如果生成后的报告再被提交，后续 commit 可能包含报告文件本身，而 `evaluated_source_commit` 仍然表示实际被评测的源码 commit
 
 | 数据集 | 系统 | Mode | Status | Uses Gold Labels | Dependency Mode | Accuracy | Citation Precision |
 | --- | --- | --- | --- | --- | --- | ---: | ---: |
