@@ -43,7 +43,7 @@ This alpha release is about protocol, artifacts, and honest baseline reporting. 
 
 - Technical report: [`reports/v0.1-alpha-results.md`](../reports/v0.1-alpha-results.md)
 - Optional LLM smoke calibration: [`reports/llm-smoke-results.md`](../reports/llm-smoke-results.md)
-- Public benchmark slice: [`reports/public-benchmark-alpha.md`](../reports/public-benchmark-alpha.md)
+- Legacy public benchmark slice: [`reports/historical/public-benchmark-alpha-legacy.md`](../reports/historical/public-benchmark-alpha-legacy.md)
 
 The current technical report records `evaluated_source_commit`, `report_generated_at`, git dirty state, exact commands, environment, dataset source/checksum, system options, answerer/judge mode, oracle/non-oracle labels, and per-system limitations.
 

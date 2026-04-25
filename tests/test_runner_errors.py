@@ -45,6 +45,9 @@ def test_continue_on_error_records_failed_example_and_continues(tmp_path: Path, 
         continue_on_error=True,
     )
 
+    assert manifest.continue_on_error is True
+    assert manifest.fail_fast is False
+    assert manifest.error_policy == "continue_on_error"
     assert summary.example_count == 3
     assert summary.completed_count == 2
     assert summary.error_count == 1
@@ -76,3 +79,53 @@ def test_fail_fast_still_raises_on_example_error(tmp_path: Path, monkeypatch: py
             limit=3,
             continue_on_error=False,
         )
+
+
+def test_manifest_records_reproducibility_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WMB_HOME", str(tmp_path))
+
+    manifest, _, _ = run_benchmark(
+        dataset_name="synthetic-mini",
+        system_name="bm25",
+        limit=3,
+        continue_on_error=False,
+    )
+
+    manifest_path = Path(manifest.run_dir) / "manifest.json"
+    persisted = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert persisted["continue_on_error"] is False
+    assert persisted["fail_fast"] is True
+    assert persisted["error_policy"] == "fail_fast"
+    assert persisted["cli_version"] == persisted["package_version"]
+    assert isinstance(persisted["platform"], dict)
+    assert persisted["platform"]["python_version"]
+    assert isinstance(persisted["extras_enabled"], list)
+
+    dependency_versions = persisted["dependency_versions"]
+    for key in [
+        "python",
+        "wiki-memory-bench",
+        "pydantic",
+        "typer",
+        "rich",
+        "numpy",
+        "huggingface_hub",
+        "sentence_transformers",
+        "litellm",
+    ]:
+        assert key in dependency_versions
+
+
+def test_manifest_error_policy_differs_for_continue_on_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WMB_HOME", str(tmp_path))
+
+    fail_fast_manifest, _, _ = run_benchmark(dataset_name="synthetic-mini", system_name="bm25", limit=1)
+    continue_manifest, _, _ = run_benchmark(
+        dataset_name="synthetic-mini",
+        system_name="bm25",
+        limit=1,
+        continue_on_error=True,
+    )
+
+    assert fail_fast_manifest.error_policy == "fail_fast"
+    assert continue_manifest.error_policy == "continue_on_error"

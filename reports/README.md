@@ -54,4 +54,8 @@ Then generate the alpha report:
 
 The resulting report is written to `reports/v0.1-alpha-results.md`.
 
+Historical reports generated before the current fairness and citation metric
+protocol live under `reports/historical/`. They are retained for audit history
+only and should not be used for current benchmark comparisons.
+
 For exact post-commit reproducibility, prefer workflow artifacts from the CI or release run that produced the report. The artifact bundle is the clearest record of the evaluated source snapshot, generated markdown, run IDs, and execution environment at the time the report was created.

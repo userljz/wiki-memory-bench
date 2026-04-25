@@ -12,6 +12,8 @@ from wiki_memory_bench.utils.tokens import content_tokens, normalize_text
 SYSTEM_REGISTRY: dict[str, type["SystemAdapter"]] = {}
 SYSTEM_ALIASES: dict[str, str] = {"full-context": "full-context-oracle"}
 ABSTENTION_MARKERS = ("not enough information", "insufficient information", "unknown", "not answerable")
+NON_ORACLE_LABEL = "non-oracle"
+ORACLE_UPPER_BOUND_LABEL = "oracle-upper-bound"
 
 
 class SystemAdapter(ABC):
@@ -56,6 +58,30 @@ def list_systems() -> list[SystemAdapter]:
     """Return system adapters sorted by name."""
 
     return [SYSTEM_REGISTRY[name]() for name in sorted(SYSTEM_REGISTRY)]
+
+
+def fairness_metadata(
+    *,
+    uses_gold_labels: bool,
+    gold_label_fields_used: list[str] | None = None,
+    oracle_label: str | None = None,
+) -> dict[str, object]:
+    """Return the standard oracle/gold-label metadata for a system result."""
+
+    fields = list(gold_label_fields_used or [])
+    oracle_mode = bool(uses_gold_labels)
+    return {
+        "uses_gold_labels": oracle_mode,
+        "oracle_mode": oracle_mode,
+        "oracle_label": oracle_label or (ORACLE_UPPER_BOUND_LABEL if oracle_mode else NON_ORACLE_LABEL),
+        "gold_label_fields_used": fields if oracle_mode else [],
+    }
+
+
+def non_oracle_fairness_metadata() -> dict[str, object]:
+    """Return standard metadata for systems that do not use gold labels."""
+
+    return fairness_metadata(uses_gold_labels=False)
 
 
 def is_abstention_choice(choice: ChoiceOption) -> bool:

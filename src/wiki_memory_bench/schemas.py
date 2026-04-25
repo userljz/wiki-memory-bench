@@ -240,6 +240,13 @@ class RunManifest(BaseModel):
     dataset_metadata: dict[str, Any] = Field(default_factory=dict)
     package_version: str | None = None
     python_version: str | None = None
+    cli_version: str | None = None
+    continue_on_error: bool = False
+    fail_fast: bool = True
+    error_policy: str = "fail_fast"
+    dependency_versions: dict[str, str | None] = Field(default_factory=dict)
+    platform: dict[str, str] = Field(default_factory=dict)
+    extras_enabled: list[str] = Field(default_factory=list)
     git_commit: str | None = None
     git_dirty: bool | None = None
     git_status: str | None = None

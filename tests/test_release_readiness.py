@@ -103,12 +103,14 @@ def test_readme_links_alpha_reports_and_keeps_claims_conservative() -> None:
     readme_cn_text = Path("README-CN.md").read_text(encoding="utf-8")
 
     assert "reports/v0.1-alpha-results.md" in readme_text
-    assert "reports/public-benchmark-alpha.md" in readme_text
+    assert "reports/public-benchmark-alpha.md" not in readme_text
+    assert "reports/historical/" in readme_text
     assert "reports/llm-smoke-results.md" in readme_text
     assert "No result in this release claims" in readme_text
     assert "SOTA" in readme_text
-    assert "Weak public alpha rows remain visible" in report_text or "weak alpha row" in report_text
+    assert "pending-clean-regeneration" in report_text
     assert "reports/v0.1-alpha-results.md" in readme_cn_text
+    assert "reports/public-benchmark-alpha.md" not in readme_cn_text
 
 
 def test_package_and_cli_import_without_optional_dependencies() -> None:

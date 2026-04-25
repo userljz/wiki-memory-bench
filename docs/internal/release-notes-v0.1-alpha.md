@@ -70,7 +70,7 @@ export LLM_API_KEY="your-api-key"
 ## Public Reports
 
 - Release report: `reports/v0.1-alpha-results.md`
-- Public benchmark slice: `reports/public-benchmark-alpha.md`
+- Legacy public benchmark slice: `reports/historical/public-benchmark-alpha-legacy.md`
 - Optional LLM smoke calibration: `reports/llm-smoke-results.md`
 
 ## Known Limitations
@@ -148,7 +148,7 @@ export LLM_API_KEY="your-api-key"
 ## Reports
 
 - Deterministic alpha report: [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)
-- Public benchmark slice: [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)
+- Legacy public benchmark slice: [`reports/historical/public-benchmark-alpha-legacy.md`](../../reports/historical/public-benchmark-alpha-legacy.md)
 - Optional LLM smoke report: [`reports/llm-smoke-results.md`](reports/llm-smoke-results.md)
 
 ## Known Limitations

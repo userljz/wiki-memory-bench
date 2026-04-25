@@ -10,7 +10,7 @@ import numpy as np
 
 from wiki_memory_bench.schemas import Citation, PreparedExample, RetrievedItem, SystemResult, TaskType, TokenUsage
 from wiki_memory_bench.systems.answering import build_answerer, build_open_qa_answerer
-from wiki_memory_bench.systems.base import SystemAdapter, choice_index, register_system
+from wiki_memory_bench.systems.base import SystemAdapter, choice_index, non_oracle_fairness_metadata, register_system
 from wiki_memory_bench.systems.retrieval import (
     InMemoryEmbeddingIndex,
     SentenceTransformerEmbedder,
@@ -128,6 +128,7 @@ class VectorRAGBaseline(SystemAdapter):
                     "answerer_mode": self.answerer_mode,
                     "embedding_cache_size": self.embedding_index.cache_size,
                     **selection.metadata,
+                    **non_oracle_fairness_metadata(),
                 },
             )
 
@@ -163,5 +164,6 @@ class VectorRAGBaseline(SystemAdapter):
                 "answerer_mode": self.answerer_mode,
                 "embedding_cache_size": self.embedding_index.cache_size,
                 **selection.metadata,
+                **non_oracle_fairness_metadata(),
             },
         )

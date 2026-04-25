@@ -139,7 +139,7 @@ def test_alpha_report_includes_provenance_and_exact_commands() -> None:
     assert "source_tree_status_at_generation:" in report_text
     assert "report_file_commit_note:" in report_text
     assert "report_commit:" not in report_text
-    assert "## Exact Commands" in report_text
+    assert "## Regeneration Requirements" in report_text
     assert "uv run wmb run --dataset synthetic-mini --system bm25 --limit 5" in report_text
 
 
@@ -183,10 +183,6 @@ def test_alpha_report_marks_oracle_systems_and_keeps_weak_rows_visible() -> None
     report_text = Path("reports/v0.1-alpha-results.md").read_text(encoding="utf-8")
 
     assert "full-context-oracle" in report_text
-    assert "## Oracle / Non-Oracle Explanation" in report_text
-    assert "vector_rag_status:" in report_text
-    assert "any_rows_use_gold_labels: `no`" in report_text
-    assert "rows_using_gold_labels: none" in report_text
-    assert "| locomo-mc10 | default | bm25 |" in report_text
-    assert "| locomo-mc10 | default | clipwiki |" in report_text
-    assert "Poor-performing rows are intentionally retained." in report_text
+    assert "oracle-upper-bound" in report_text
+    assert "pending-clean-regeneration" in report_text
+    assert "WMB_ALLOW_DIRTY_REPORT=1" not in report_text

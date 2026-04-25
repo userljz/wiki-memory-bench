@@ -91,6 +91,7 @@ def test_clipwiki_oracle_curated_may_select_gold_session_and_marks_metadata(tmp_
 
     assert prediction.metadata["uses_gold_labels"] is True
     assert prediction.metadata["oracle_mode"] is True
+    assert prediction.metadata["oracle_label"] == "oracle-upper-bound"
     assert prediction.metadata["gold_label_fields_used"] == ["gold_evidence"]
 
 
@@ -105,6 +106,7 @@ def test_clipwiki_full_wiki_marks_non_oracle_metadata(tmp_path: Path) -> None:
 
     assert prediction.metadata["uses_gold_labels"] is False
     assert prediction.metadata["oracle_mode"] is False
+    assert prediction.metadata["oracle_label"] == "non-oracle"
     assert prediction.metadata["gold_label_fields_used"] == []
 
 

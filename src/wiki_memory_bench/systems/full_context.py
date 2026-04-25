@@ -6,8 +6,15 @@ from pathlib import Path
 from time import perf_counter
 
 from wiki_memory_bench.schemas import Citation, PreparedExample, RetrievedItem, SystemResult, TaskType, TokenUsage
-from wiki_memory_bench.systems.answering import build_answerer, build_open_qa_answerer
-from wiki_memory_bench.systems.base import SystemAdapter, choice_index, choose_multiple_choice_answer, register_system
+from wiki_memory_bench.systems.answering import OpenQASelection, build_answerer, build_open_qa_answerer
+from wiki_memory_bench.systems.base import (
+    SystemAdapter,
+    choice_index,
+    choose_multiple_choice_answer,
+    fairness_metadata,
+    non_oracle_fairness_metadata,
+    register_system,
+)
 from wiki_memory_bench.utils.tokens import estimate_text_tokens, estimate_token_total
 
 
@@ -75,6 +82,12 @@ class _BaseFullContextBaseline(SystemAdapter):
     def _deterministic_mc(self, example, lexical_choice, supporting_clip, confidence):
         raise NotImplementedError
 
+    def _select_open_qa_answer(self, example: PreparedExample, retrieved_items: list[RetrievedItem]) -> OpenQASelection:
+        return self.open_qa_answerer.answer_question(example, retrieved_items)
+
+    def _fairness_metadata(self, example: PreparedExample) -> dict[str, object]:
+        return non_oracle_fairness_metadata()
+
     def run(self, example: PreparedExample) -> SystemResult:
         started = perf_counter()
         ordered_clips = sorted(example.history_clips, key=lambda clip: clip.timestamp)
@@ -126,10 +139,11 @@ class _BaseFullContextBaseline(SystemAdapter):
                     "lexical_fallback_choice": lexical_choice.choice_id,
                     "llm_rationale": llm_rationale,
                     "retrieval_top_k": len(retrieved_items),
+                    **self._fairness_metadata(example),
                 },
             )
 
-        selection = self.open_qa_answerer.answer_question(example, retrieved_items)
+        selection = self._select_open_qa_answer(example, retrieved_items)
         if selection.supporting_item is not None:
             supporting_clip = next((clip for clip in ordered_clips if clip.clip_id == selection.supporting_item.clip_id), None)
             if supporting_clip is not None:
@@ -164,6 +178,7 @@ class _BaseFullContextBaseline(SystemAdapter):
                 "llm_rationale": selection.rationale,
                 "retrieval_top_k": len(retrieved_items),
                 **selection.metadata,
+                **self._fairness_metadata(example),
             },
         )
 
@@ -178,6 +193,24 @@ class FullContextOracleBaseline(_BaseFullContextBaseline):
 
     def _deterministic_mc(self, example, lexical_choice, supporting_clip, confidence):
         return self._oracle_choice(example), supporting_clip, confidence, None, TokenUsage(), "oracle"
+
+    def _select_open_qa_answer(self, example: PreparedExample, retrieved_items: list[RetrievedItem]) -> OpenQASelection:
+        if self.answerer_mode != "deterministic":
+            return super()._select_open_qa_answer(example, retrieved_items)
+        return OpenQASelection(
+            answer_text=example.answer or "",
+            supporting_item=None,
+            confidence=1.0,
+            metadata={"selection_mode": "oracle"},
+        )
+
+    def _fairness_metadata(self, example: PreparedExample) -> dict[str, object]:
+        fields = (
+            ["correct_choice_index", "correct_choice_id", "choices[correct_choice_index].text"]
+            if example.task_type == TaskType.MULTIPLE_CHOICE
+            else ["answer"]
+        )
+        return fairness_metadata(uses_gold_labels=True, gold_label_fields_used=fields)
 
 
 @register_system

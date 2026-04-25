@@ -1,6 +1,0 @@
-20260425T095635Z-synthetic-mini-bm25	synthetic-mini	bm25
-20260425T095636Z-synthetic-wiki-memory-bm25	synthetic-wiki-memory	bm25
-20260425T095638Z-synthetic-wiki-memory-clipwiki	synthetic-wiki-memory	clipwiki
-20260425T095654Z-locomo-mc10-bm25	locomo-mc10	bm25
-20260425T095724Z-locomo-mc10-vector-rag	locomo-mc10	vector-rag
-20260425T095845Z-locomo-mc10-clipwiki	locomo-mc10	clipwiki

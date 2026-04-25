@@ -5,7 +5,9 @@ from __future__ import annotations
 import subprocess
 import sys
 import traceback
+import platform as platform_module
 from datetime import datetime, timezone
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from time import perf_counter
 
@@ -136,9 +138,11 @@ def run_benchmark(
     retrieval_top_k = max((result.metadata.get("retrieval_top_k", 0) for result in completed_results), default=0) or None
     uses_gold_labels = any(bool(result.metadata.get("uses_gold_labels")) for result in completed_results)
     oracle_mode = any(bool(result.metadata.get("oracle_mode")) for result in completed_results)
-    oracle_label = "oracle" if oracle_mode else "non-oracle"
+    oracle_label = "oracle-upper-bound" if oracle_mode else "non-oracle"
     git_commit, git_dirty, git_status = _git_state()
     answerer_mode = str(resolved_system_options.get("answerer", "deterministic"))
+    error_policy = "continue_on_error" if continue_on_error else "fail_fast"
+    dependency_versions = _dependency_versions()
 
     manifest = RunManifest(
         run_id=run_id,
@@ -158,6 +162,13 @@ def run_benchmark(
         dataset_metadata=dataset.metadata,
         package_version=wiki_memory_bench.__version__,
         python_version=sys.version.split()[0],
+        cli_version=wiki_memory_bench.__version__,
+        continue_on_error=continue_on_error,
+        fail_fast=not continue_on_error,
+        error_policy=error_policy,
+        dependency_versions=dependency_versions,
+        platform=_platform_metadata(),
+        extras_enabled=_extras_enabled(dependency_versions),
         git_commit=git_commit,
         git_dirty=git_dirty,
         git_status=git_status,
@@ -255,3 +266,46 @@ def _git_state() -> tuple[str | None, bool | None, str | None]:
     except Exception:
         return None, None, None
     return commit, bool(status), status or "clean"
+
+
+def _dependency_versions() -> dict[str, str | None]:
+    package_names = {
+        "python": None,
+        "wiki-memory-bench": "wiki-memory-bench",
+        "pydantic": "pydantic",
+        "typer": "typer",
+        "rich": "rich",
+        "numpy": "numpy",
+        "huggingface_hub": "huggingface-hub",
+        "sentence_transformers": "sentence-transformers",
+        "litellm": "litellm",
+    }
+    versions: dict[str, str | None] = {"python": sys.version.split()[0]}
+    for key, package_name in package_names.items():
+        if package_name is None:
+            continue
+        try:
+            versions[key] = importlib_metadata.version(package_name)
+        except importlib_metadata.PackageNotFoundError:
+            versions[key] = None
+    versions["wiki-memory-bench"] = wiki_memory_bench.__version__
+    return versions
+
+
+def _platform_metadata() -> dict[str, str]:
+    return {
+        "system": platform_module.system(),
+        "release": platform_module.release(),
+        "machine": platform_module.machine(),
+        "python_implementation": platform_module.python_implementation(),
+        "python_version": platform_module.python_version(),
+    }
+
+
+def _extras_enabled(dependency_versions: dict[str, str | None]) -> list[str]:
+    extras: list[str] = []
+    if dependency_versions.get("sentence_transformers"):
+        extras.append("vector")
+    if dependency_versions.get("litellm"):
+        extras.append("llm")
+    return extras

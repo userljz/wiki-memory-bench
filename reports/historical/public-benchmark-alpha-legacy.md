@@ -1,4 +1,6 @@
-# Public Benchmark Alpha
+# Public Benchmark Alpha Legacy
+
+Historical alpha report generated before v0.1 fairness/citation metric updates. Do not use for current comparisons.
 
 This report is an engineering-focused public benchmark slice for `wiki-memory-bench`.
 
@@ -22,6 +24,7 @@ These are alpha slices, not final scientific leaderboard claims.
 - `longmemeval-s` rows below use `--limit 20`
 - weak rows are intentionally retained
 - oracle rows are separated from the main non-oracle table
+- this legacy report uses the old `Citation Precision` column, not the current evidence-aware citation source metrics
 
 ## Exact Commands
 
@@ -50,7 +53,7 @@ uv run wmb run --dataset longmemeval-s --system clipwiki --answerer llm --judge 
 
 ## Deterministic Non-Oracle Rows
 
-| Dataset | System | Mode | Limit | Accuracy | Citation Precision | Avg Latency (ms) | Avg Retrieved Tokens | Run ID | Notes |
+| Dataset | System | Mode | Limit | Accuracy | Citation Precision (legacy) | Avg Latency (ms) | Avg Retrieved Tokens | Run ID | Notes |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
 | `locomo-mc10` | `bm25` | default | 100 | 33.00% | 13.00% | 2.94 | 2255.96 | `20260420T144530Z-locomo-mc10-bm25` | Cheap lexical baseline; strongest deterministic non-oracle public row in this slice. |
 | `locomo-mc10` | `vector-rag` | default | 100 | 23.00% | 8.00% | 494.62 | 852.99 | `20260420T144529Z-locomo-mc10-vector-rag` | Lower retrieved token count, but weaker answer accuracy on this slice. |
@@ -64,7 +67,7 @@ uv run wmb run --dataset longmemeval-s --system clipwiki --answerer llm --judge 
 
 These rows are intentionally excluded from the main non-oracle table.
 
-| Dataset | System | Limit | Accuracy | Citation Precision | Avg Latency (ms) | Avg Retrieved Tokens | Run ID | Why It Is Separate |
+| Dataset | System | Limit | Accuracy | Citation Precision (legacy) | Avg Latency (ms) | Avg Retrieved Tokens | Run ID | Why It Is Separate |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
 | `locomo-mc10` | `full-context-oracle` | 100 | 100.00% | 18.00% | 24.27 | 14955.00 | `20260420T144750Z-locomo-mc10-full-context-oracle` | Deterministic mode uses gold labels directly and is only an upper bound. |
 
@@ -103,7 +106,7 @@ Pending LLM rows:
 - `clipwiki curated` only slightly improved over `clipwiki full-wiki`, suggesting that current heuristic session selection is not yet a decisive advantage on this public dataset.
 - `vector-rag` retrieved fewer tokens than `bm25`, but that efficiency did not translate into higher answer accuracy on this slice.
 - `full-context-oracle` reached `100%` accuracy, which highlights how large the gap is between public deployable baselines and a gold-label upper bound.
-- On the `longmemeval-s` alpha slice, `bm25` and `clipwiki` were much closer than on `locomo-mc10`, and both achieved strong citation precision.
+- On the `longmemeval-s` alpha slice, `bm25` and `clipwiki` were much closer than on `locomo-mc10`, and both achieved strong legacy citation precision.
 
 ## Interpretation
 

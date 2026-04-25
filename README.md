@@ -80,7 +80,7 @@ Do not mix optional LLM calibration or oracle upper bounds into a fair non-oracl
 
 ## v0.1-alpha Results
 
-The deterministic alpha snapshot is intentionally small and conservative. Full provenance, commands, run IDs, weak rows, and failure analysis are in [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md).
+The deterministic alpha snapshot is intentionally small and conservative. The release report path is [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md); regenerate it from a clean release commit with `./scripts/reproduce_v0_1_alpha.sh` before using it as a public result artifact.
 
 | Slice | Systems | Notes |
 | --- | --- | --- |
@@ -91,8 +91,9 @@ The deterministic alpha snapshot is intentionally small and conservative. Full p
 Related reports:
 
 - Deterministic alpha report: [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)
-- Broader public slice: [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)
 - Optional LLM smoke calibration: [`reports/llm-smoke-results.md`](reports/llm-smoke-results.md)
+
+Legacy alpha slices generated before the current fairness and citation protocol are kept under [`reports/historical/`](reports/historical/) and are not current comparison results.
 
 No result in this release claims that ClipWiki or any other system is SOTA.
 

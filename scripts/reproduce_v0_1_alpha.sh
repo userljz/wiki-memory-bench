@@ -148,13 +148,13 @@ def classify_gold_usage(system_name: str, metadata: dict[str, object]) -> tuple[
         return oracle_label, uses_gold_labels, detail
     if system_name in {"full-context-oracle", "full-context"}:
         return (
-            "oracle",
+            "oracle-upper-bound",
             True,
             "Deterministic multiple-choice mode uses the gold answer directly.",
         )
     if system_name == "clipwiki" and mode == "oracle-curated":
         return (
-            "gold-evidence-selection",
+            "oracle-upper-bound",
             True,
             "Uses gold evidence/session labels to choose wiki source pages.",
         )
@@ -205,6 +205,7 @@ record = {
     "examples": summary.get("example_count"),
     "completed_count": summary.get("completed_count"),
     "error_count": summary.get("error_count"),
+    "error_rate": summary.get("error_rate"),
     "accuracy": summary.get("accuracy"),
     "citation_precision": summary.get("citation_precision"),
     "citation_source_precision": summary.get("citation_source_precision"),
@@ -218,6 +219,8 @@ record = {
     "avg_wiki_tokens": summary.get("avg_wiki_size_tokens"),
     "dataset_source": source_metadata,
     "prepared_cache": prepared_cache,
+    "error_policy": manifest.get("error_policy"),
+    "dependency_versions": manifest.get("dependency_versions", {}),
     "command": command_string,
     "notes": os.environ["NOTES"],
     "known_limitations": os.environ["LIMITATIONS"],
@@ -286,13 +289,13 @@ def option_value(flag: str) -> str | None:
 def classify_gold_usage(system_name: str, mode: str) -> tuple[str, bool, str]:
     if system_name in {"full-context-oracle", "full-context"}:
         return (
-            "oracle",
+            "oracle-upper-bound",
             True,
             "Deterministic multiple-choice mode uses the gold answer directly.",
         )
     if system_name == "clipwiki" and mode == "oracle-curated":
         return (
-            "gold-evidence-selection",
+            "oracle-upper-bound",
             True,
             "Uses gold evidence/session labels to choose wiki source pages.",
         )
@@ -327,6 +330,7 @@ record = {
     "examples": None,
     "completed_count": 0,
     "error_count": None,
+    "error_rate": None,
     "accuracy": None,
     "citation_precision": None,
     "citation_source_precision": None,
@@ -340,6 +344,8 @@ record = {
     "avg_wiki_tokens": None,
     "dataset_source": {},
     "prepared_cache": {},
+    "error_policy": "fail_fast",
+    "dependency_versions": {},
     "command": command_string,
     "notes": os.environ["NOTES"],
     "known_limitations": os.environ["LIMITATIONS"],
@@ -366,6 +372,14 @@ run_case \
   "5" \
   "Tiny smoke suite; useful for sanity checks, not a realistic long-memory benchmark." \
   "Too small to compare systems rigorously."
+
+run_case \
+  "synthetic-mini" \
+  "full-context-oracle" \
+  "deterministic" \
+  "5" \
+  "Oracle upper-bound smoke row; verifies gold-label metadata is surfaced in artifacts." \
+  "Uses gold labels directly and is excluded from fair non-oracle comparisons."
 
 if [[ "$SMOKE_ONLY" != "1" ]]; then
   run_case \
@@ -522,9 +536,17 @@ def dataset_source_notes(records: list[dict[str, object]]) -> list[str]:
 
 def system_option_notes(records: list[dict[str, object]]) -> list[str]:
     return [
-        f"- `{record['dataset']} + {record['system']}`: system_options=`{record.get('system_options', {})}`, answerer=`{record.get('answerer')}`, judge=`{record.get('judge')}`"
+        f"- `{record['dataset']} + {record['system']}`: system_options=`{record.get('system_options', {})}`, answerer=`{record.get('answerer')}`, judge=`{record.get('judge')}`, error_policy=`{record.get('error_policy', 'fail_fast')}`"
         for record in records
     ]
+
+
+def dependency_version_notes(records: list[dict[str, object]]) -> list[str]:
+    for record in records:
+        versions = record.get("dependency_versions")
+        if isinstance(versions, dict) and versions:
+            return [f"- `{key}`: `{value if value is not None else 'not installed'}`" for key, value in sorted(versions.items())]
+    return ["- Structured dependency versions were not recorded for these rows."]
 
 
 def failure_analysis(records: list[dict[str, object]]) -> list[str]:
@@ -637,11 +659,15 @@ lines.extend(
     ]
 )
 lines.append("")
+lines.append("### Dependency Versions")
+lines.append("")
+lines.extend(dependency_version_notes(records))
+lines.append("")
 lines.append("## Benchmark Protocol")
 lines.append("")
 lines.append("- Deterministic no-key evaluation is the default path.")
 lines.append("- Rows use deterministic answerers and deterministic judges unless explicitly stated otherwise.")
-lines.append("- Oracle rows and gold-evidence-selection rows are upper bounds and are excluded from fair non-oracle comparisons.")
+lines.append("- Oracle rows are upper bounds and are excluded from fair non-oracle comparisons.")
 lines.append("- Optional LLM calibration is reported separately and is not part of this deterministic alpha table.")
 lines.append("- All commands are listed exactly below; run artifacts are saved under `runs/` with manifests, summaries, predictions, and system artifacts.")
 lines.append("")
@@ -674,11 +700,11 @@ lines.extend(system_option_notes(records))
 lines.append("")
 lines.append("## Result Table")
 lines.append("")
-lines.append("| Dataset | Split | System | Mode | Answerer | Judge | Oracle Label | Examples | Accuracy | Citation Source F1 | Citation Precision | Stale Citation Rate | Avg Latency (ms) | Avg Retrieved Tokens | Avg Wiki Tokens | Dependency Mode | Uses Gold Labels | Status |")
+lines.append("| Dataset | Split | System | Mode | Answerer | Judge | Oracle Label | Examples | Accuracy | Citation Source F1 | Stale Citation Rate | Unsupported Answer Rate | Error Rate | Avg Latency (ms) | Avg Retrieved Tokens | Avg Wiki Tokens | Dependency Mode | Uses Gold Labels | Status |")
 lines.append("| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |")
 for record in records:
     lines.append(
-        "| {dataset} | {split} | {system} | {mode} | {answerer} | {judge} | {oracle_label} | {examples} | {accuracy} | {citation_source_f1} | {citation_precision} | {stale_citation_rate} | {latency} | {retrieved} | {wiki_tokens} | {dependency_mode} | {uses_gold_labels} | {status} |".format(
+        "| {dataset} | {split} | {system} | {mode} | {answerer} | {judge} | {oracle_label} | {examples} | {accuracy} | {citation_source_f1} | {stale_citation_rate} | {unsupported_answer_rate} | {error_rate} | {latency} | {retrieved} | {wiki_tokens} | {dependency_mode} | {uses_gold_labels} | {status} |".format(
             dataset=record["dataset"],
             split=record.get("split", "default"),
             system=record["system"],
@@ -691,9 +717,10 @@ for record in records:
             dependency_mode=record["dependency_mode"],
             status=record["status"],
             accuracy=fmt_metric(record["accuracy"], pct=True),
-            citation_precision=fmt_metric(record["citation_precision"], pct=True),
             citation_source_f1=fmt_metric(record.get("citation_source_f1"), pct=True),
             stale_citation_rate=fmt_metric(record.get("stale_citation_rate"), pct=True),
+            unsupported_answer_rate=fmt_metric(record.get("unsupported_answer_rate"), pct=True),
+            error_rate=fmt_metric(record.get("error_rate"), pct=True),
             latency=fmt_metric(record["avg_latency_ms"]),
             retrieved=fmt_metric(record["avg_retrieved_tokens"]),
             wiki_tokens=fmt_metric(record.get("avg_wiki_tokens")),
@@ -717,9 +744,9 @@ lines.append("")
 lines.append("## Oracle / Non-Oracle Explanation")
 lines.append("")
 lines.append("- `non-oracle`: the row does not use gold labels during retrieval or answering. These rows are eligible for fair system-to-system comparisons within the limits of the benchmark slice.")
-lines.append("- `oracle`: the row uses gold labels directly at runtime and must be interpreted only as an upper bound, not as a deployable baseline.")
+lines.append("- `oracle-upper-bound`: the row uses gold labels directly at runtime and must be interpreted only as an upper bound, not as a deployable baseline.")
 lines.append("- `full-context-oracle` is an oracle upper-bound system and is excluded from fair non-oracle comparisons.")
-lines.append("- `gold-evidence-selection`: the row uses gold evidence labels to choose retrieval context. The ClipWiki mode that may do this is `clipwiki --mode oracle-curated`.")
+lines.append("- `clipwiki --mode oracle-curated` is also labeled `oracle-upper-bound` because it uses gold evidence labels to choose retrieval context.")
 lines.append("- `full-wiki` and `curated` ClipWiki modes are non-oracle modes. They must not read `gold_evidence`, `answer_session_ids`, or `has_answer` labels.")
 lines.append("")
 lines.append("## Limitations")

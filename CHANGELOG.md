@@ -24,7 +24,7 @@ First public alpha release.
 ### Evaluation and Reporting
 
 - Added `reports/v0.1-alpha-results.md` for reproducible release-readiness reporting.
-- Added `reports/public-benchmark-alpha.md` for a broader public-dataset alpha slice.
+- Added a broader public-dataset alpha slice, now retained as historical context under `reports/historical/public-benchmark-alpha-legacy.md`.
 - Added dirty-working-tree protection so public reports are refused unless explicitly overridden.
 - Added release-grade regression tests for:
   - release readiness

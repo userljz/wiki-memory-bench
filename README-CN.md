@@ -112,11 +112,11 @@ deterministic alpha rows 混成同一个 leaderboard。
 
 ## v0.1-alpha 结果快照
 
-当前可复现的 alpha 报告在 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。其中包含 `evaluated_source_commit`、`report_generated_at`、`source_tree_status_at_generation`、`report_file_commit_note`、精确命令、vector-rag 状态、gold-label 使用情况、run ID、依赖模式和 failure analysis。
+当前 release 报告路径是 [`reports/v0.1-alpha-results.md`](reports/v0.1-alpha-results.md)。正式公开使用前，需要在提交后的 clean release commit 上运行 `./scripts/reproduce_v0_1_alpha.sh` 重新生成；生成后的报告会包含 `evaluated_source_commit`、`report_generated_at`、`source_tree_status_at_generation`、精确命令、gold-label 使用情况、run ID、依赖模式和 failure analysis。
 
-如果你想看更偏公共数据集的 alpha slice，并且把 non-oracle 行和 oracle upper bound 分开看，请参考 [`reports/public-benchmark-alpha.md`](reports/public-benchmark-alpha.md)。
+旧版公共数据集 alpha slice 已移到 [`reports/historical/`](reports/historical/)，只作为 historical artifact 保留，不再作为当前协议下的比较结果入口。
 
-下面这张表是 alpha 报告里 `Result Table` 的压缩摘要，刻意保持保守：
+正式 alpha 报告重新生成后，`Result Table` 应使用当前 evidence-aware 指标，并刻意保持保守：
 
 - 它混合了 smoke 行和 limited-slice alpha 行
 - 它不是最终的 scientific leaderboard
@@ -125,21 +125,17 @@ deterministic alpha rows 混成同一个 leaderboard。
 - oracle rows 只是 upper bounds，不能纳入公平的 non-oracle 系统比较
 - ClipWiki 的 `full-wiki` 和 `curated` 是 non-oracle mode；只有 `oracle-curated` 可以使用 gold evidence labels
 
-| 数据集 | 系统 | Mode | Status | Uses Gold Labels | Dependency Mode | Accuracy | Citation Precision |
-| --- | --- | --- | --- | --- | --- | ---: | ---: |
-| `synthetic-mini` | `bm25` | `default` | `ok` | `no` | `core` | 100.00% | 80.00% |
-| `synthetic-wiki-memory` | `bm25` | `default` | `ok` | `no` | `core` | 70.00% | 50.00% |
-| `synthetic-wiki-memory` | `clipwiki` | `full-wiki` | `ok` | `no` | `core` | 70.00% | 60.00% |
-| `locomo-mc10` | `bm25` | `default` | `ok` | `no` | `core` | 28.00% | 4.00% |
-| `locomo-mc10` | `vector-rag` | `default` | `ok` | `no` | `vector-extra-installed` | 22.00% | 6.00% |
-| `locomo-mc10` | `clipwiki` | `full-wiki` | `ok` | `no` | `core` | 30.00% | 4.00% |
+| 数据集 | 系统 | Mode | Status | Uses Gold Labels | Oracle Label | Accuracy | Citation Source F1 | Stale Citation Rate | Unsupported Answer Rate | Error Rate |
+| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `synthetic-mini` | `bm25` | `default` | clean regenerate pending | `no` | `non-oracle` | pending | pending | pending | pending | pending |
+| `synthetic-mini` | `full-context-oracle` | `default` | clean regenerate pending | `yes` | `oracle-upper-bound` | pending | pending | pending | pending | pending |
 
 当前 alpha 报告状态摘要：
 
-- `vector-rag`：`ran`（`status=ok`，`dependency_mode=vector-extra-installed`）
-- 使用 gold labels 的行：`none`
+- clean release report：`pending-clean-regeneration`
+- 使用 gold labels 的行：提交后重新生成时应包含 `full-context-oracle`，并标为 `oracle-upper-bound`
 
-在当前 alpha 报告里，`locomo-mc10` 这几行都只是 citation precision 偏低的弱 alpha slice。它们应该被理解为某个时间点的工程快照，而不是“某个系统总体胜出”的证据。
+旧的 public alpha slice 已被降级为 historical artifact。当前协议下不要使用旧的 legacy citation precision 表格做系统比较。
 
 ## 已支持的数据集
 

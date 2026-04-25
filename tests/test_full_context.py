@@ -15,6 +15,10 @@ def test_full_context_baseline_answers_all_synthetic_cases() -> None:
         example.correct_choice_id for example in dataset.examples
     ]
     assert all(prediction.metadata["baseline_type"] == "oracle_upper_bound" for prediction in predictions)
+    assert all(prediction.metadata["uses_gold_labels"] is True for prediction in predictions)
+    assert all(prediction.metadata["oracle_mode"] is True for prediction in predictions)
+    assert all(prediction.metadata["oracle_label"] == "oracle-upper-bound" for prediction in predictions)
+    assert all("correct_choice_index" in prediction.metadata["gold_label_fields_used"] for prediction in predictions)
 
 
 def test_full_context_heuristic_does_not_use_gold_labels() -> None:
@@ -48,3 +52,7 @@ def test_full_context_heuristic_does_not_use_gold_labels() -> None:
     assert prediction.selected_choice_id == "choice-2"
     assert prediction.metadata["baseline_type"] == "heuristic_reference"
     assert prediction.metadata["selection_mode"] == "heuristic"
+    assert prediction.metadata["uses_gold_labels"] is False
+    assert prediction.metadata["oracle_mode"] is False
+    assert prediction.metadata["oracle_label"] == "non-oracle"
+    assert prediction.metadata["gold_label_fields_used"] == []

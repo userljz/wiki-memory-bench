@@ -13,7 +13,7 @@ from time import perf_counter
 
 from wiki_memory_bench.schemas import Citation, PreparedExample, RetrievedItem, SystemResult, TaskType, TokenUsage
 from wiki_memory_bench.systems.answering import build_answerer, build_open_qa_answerer
-from wiki_memory_bench.systems.base import SystemAdapter, choice_index, register_system
+from wiki_memory_bench.systems.base import SystemAdapter, choice_index, non_oracle_fairness_metadata, register_system
 from wiki_memory_bench.systems.retrieval import build_session_documents
 from wiki_memory_bench.utils.tokens import content_tokens, estimate_text_tokens, estimate_token_total
 
@@ -206,6 +206,7 @@ class BasicMemoryAdapter(SystemAdapter):
                     "external_cli_invoked": self._external_cli_invoked,
                     "basic_memory_project_dir": str(project_dir),
                     **selection.metadata,
+                    **non_oracle_fairness_metadata(),
                 },
             )
 
@@ -255,6 +256,7 @@ class BasicMemoryAdapter(SystemAdapter):
                 "external_cli_invoked": self._external_cli_invoked,
                 "basic_memory_project_dir": str(project_dir),
                 **selection.metadata,
+                **non_oracle_fairness_metadata(),
             },
         )
 

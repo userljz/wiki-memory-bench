@@ -9,7 +9,7 @@ from time import perf_counter
 from wiki_memory_bench.clipwiki.compiler import GOLD_LABEL_FIELDS, ORACLE_MODES, compile_clipwiki, page_score_lookup, retrieve_wiki_pages
 from wiki_memory_bench.schemas import Citation, PreparedExample, RetrievedItem, SystemResult, TaskType, TokenUsage
 from wiki_memory_bench.systems.answering import build_answerer, build_open_qa_answerer
-from wiki_memory_bench.systems.base import SystemAdapter, choice_index, register_system
+from wiki_memory_bench.systems.base import SystemAdapter, choice_index, fairness_metadata, register_system
 from wiki_memory_bench.utils.tokens import estimate_text_tokens, estimate_token_total
 
 
@@ -138,8 +138,8 @@ class ClipWikiBaseline(SystemAdapter):
                     "answerer_mode": self.answerer_mode,
                     "selected_session_ids": compiled_wiki.selected_session_ids,
                     "wiki_dir": str(example_wiki_dir),
-                    **fairness_metadata,
                     **selection.metadata,
+                    **fairness_metadata,
                 },
             )
 
@@ -191,16 +191,14 @@ class ClipWikiBaseline(SystemAdapter):
                 "answerer_mode": self.answerer_mode,
                 "selected_session_ids": compiled_wiki.selected_session_ids,
                 "wiki_dir": str(example_wiki_dir),
-                **fairness_metadata,
                 **selection.metadata,
+                **fairness_metadata,
             },
         )
 
     def _fairness_metadata(self) -> dict[str, object]:
         oracle_mode = self.mode in ORACLE_MODES
-        return {
-            "oracle_label": "gold-evidence-selection" if oracle_mode else "non-oracle",
-            "uses_gold_labels": oracle_mode,
-            "oracle_mode": oracle_mode,
-            "gold_label_fields_used": list(GOLD_LABEL_FIELDS) if oracle_mode else [],
-        }
+        return fairness_metadata(
+            uses_gold_labels=oracle_mode,
+            gold_label_fields_used=list(GOLD_LABEL_FIELDS) if oracle_mode else [],
+        )
